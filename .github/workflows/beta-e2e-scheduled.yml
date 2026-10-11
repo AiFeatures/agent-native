@@ -25,6 +25,7 @@ jobs:
       key_source: dedicated
     secrets: inherit
     permissions:
+      actions: read
       contents: read
 
   # Keep one collector and digest implementation for scheduled and manual runs.

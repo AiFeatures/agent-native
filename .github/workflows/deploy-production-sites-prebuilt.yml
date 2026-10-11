@@ -140,6 +140,9 @@ jobs:
     name: Beta E2E pre-flight
     if: ${{ inputs.beta_e2e }}
     uses: ./.github/workflows/beta-e2e.yml
+    permissions:
+      actions: read
+      contents: read
     with:
       apps: all
       lane: public
