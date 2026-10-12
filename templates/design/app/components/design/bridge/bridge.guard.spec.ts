@@ -17676,8 +17676,18 @@ it(
       );
       await page.evaluate(() => {
         (window as any).__bridgeMessages = [];
+        document.dispatchEvent(new Event("selectionchange"));
       });
+      await page.waitForFunction(() =>
+        ((window as any).__bridgeMessages ?? []).some(
+          (message: any) =>
+            message.type === "text-editing-state" &&
+            message.active === true &&
+            message.hasRange === true,
+        ),
+      );
 
+      const preLoadMessageCount = (await readBridgeMessages(page)).length;
       releaseFontResponse?.();
       await page.evaluate(async () => {
         await document.fonts.ready;
@@ -17691,21 +17701,37 @@ it(
           "قياس ارتفاع النص",
         );
       });
-      let loadedMessages = await readBridgeMessages(page);
-      await page.waitForFunction(() => {
-        const messages = (window as any).__bridgeMessages ?? [];
-        return (
-          messages.some((message: any) => message.type === "element-select") &&
-          messages.some(
-            (message: any) =>
-              message.type === "text-editing-state" &&
-              message.active === true &&
-              message.hasRange === true,
-          )
+      await page.waitForFunction((startIndex) => {
+        const messages = ((window as any).__bridgeMessages ?? [])
+          .slice(startIndex)
+          .reverse();
+        const height = document
+          .querySelector("#text")!
+          .getBoundingClientRect().height;
+        const selected = messages.find(
+          (message: any) => message.type === "element-select",
         );
-      });
-      loadedMessages = await readBridgeMessages(page);
-      const activeRangeUpdate = loadedMessages.find(
+        const range = messages.find(
+          (message: any) =>
+            message.type === "text-editing-state" &&
+            message.active === true &&
+            message.hasRange === true,
+        );
+        return (
+          Math.abs(
+            Number.parseFloat(
+              selected?.payload?.computedStyles?.resolvedLineHeightPx,
+            ) - height,
+          ) < 0.05 &&
+          Math.abs(
+            Number.parseFloat(range?.computedStyles?.resolvedLineHeightPx) -
+              height,
+          ) < 0.05
+        );
+      }, preLoadMessageCount);
+      let loadedMessages = await readBridgeMessages(page);
+      const latestLoadedMessages = loadedMessages.slice().reverse();
+      const activeRangeUpdate = latestLoadedMessages.find(
         (message) =>
           message.type === "text-editing-state" &&
           (message as { active?: boolean }).active === true &&
@@ -17735,7 +17761,7 @@ it(
             message.type === "style-change",
         ),
       ).toBe(false);
-      const wholeLayerUpdate = loadedMessages.find(
+      const wholeLayerUpdate = latestLoadedMessages.find(
         (message) => message.type === "element-select",
       ) as
         | {
