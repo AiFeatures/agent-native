@@ -1274,6 +1274,16 @@ it("ignores only an in-flight browser-session claim canceled by cleanup navigati
     ]),
   ).toBe(true);
   expect(
+    isExpectedWatchedRequestCorsError(message, "cleanup/navigation", [
+      { ...candidate, competingClaimStartedAfterNavigation: true },
+    ]),
+  ).toBe(true);
+  expect(
+    isExpectedWatchedRequestCorsError(message, "cleanup/navigation", [
+      { ...candidate, competingRequestStartedAfterNavigation: true },
+    ]),
+  ).toBe(false);
+  expect(
     isExpectedWatchedRequestCorsError(message, "step 12", [candidate]),
   ).toBe(false);
   expect(
@@ -1326,12 +1336,23 @@ it("ignores the browser-session poll warning only for a canceled cleanup claim",
   ).toBe(true);
   expect(
     isExpectedCleanupBrowserSessionPollConsoleError(warning, [
+      { ...candidate, competingClaimStartedAfterNavigation: true },
+    ]),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupBrowserSessionPollConsoleError(warning, [
       { ...candidate, requestWasPendingAtNavigation: false },
     ]),
   ).toBe(false);
   expect(
     isExpectedCleanupBrowserSessionPollConsoleError(warning, [
       { ...candidate, ageMs: 9_000 },
+    ]),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupBrowserSessionPollConsoleError(warning, [
+      candidate,
+      { ...candidate, ageMs: 200 },
     ]),
   ).toBe(false);
   expect(
@@ -1371,7 +1392,7 @@ it("ignores browser-session poll or heartbeat errors only for matching canceled 
 
   expect(
     isExpectedSaveReloadBrowserSessionConsoleError(pollWarning, "save/reload", [
-      claimCandidate,
+      { ...claimCandidate, settledAgeMs: 13 },
     ]),
   ).toBe(true);
   expect(
@@ -1401,6 +1422,17 @@ it("ignores browser-session poll or heartbeat errors only for matching canceled 
   expect(
     isExpectedSaveReloadBrowserSessionConsoleError(pollWarning, "save/reload", [
       { ...claimCandidate, ageMs: 9_000 },
+    ]),
+  ).toBe(false);
+  expect(
+    isExpectedSaveReloadBrowserSessionConsoleError(pollWarning, "save/reload", [
+      { ...claimCandidate, settledAgeMs: 1_000 },
+    ]),
+  ).toBe(false);
+  expect(
+    isExpectedSaveReloadBrowserSessionConsoleError(pollWarning, "save/reload", [
+      claimCandidate,
+      { ...claimCandidate, ageMs: 200 },
     ]),
   ).toBe(false);
   expect(
@@ -1527,7 +1559,7 @@ it("normalizes only Firefox browser-session errors with the expected console arg
   ).toBe("[Agent-Native browser session] poll failed: JSHandle@object");
 });
 
-it("accepts cleanup request cancellations only while navigation is pending", () => {
+it("accepts cleanup request cancellations while navigation errors are delivered", () => {
   const candidate = {
     url: "http://localhost:45715/_agent-native/browser-sessions/session-id/requests/claim",
     pathname: "/_agent-native/browser-sessions/session-id/requests/claim",
@@ -1537,17 +1569,53 @@ it("accepts cleanup request cancellations only while navigation is pending", () 
   };
   const message = `Fetch API cannot load ${candidate.url} due to access control checks.`;
 
+  // WebKit may report the aborted fetch after page.goto has already resolved.
   expect(isExpectedCleanupNavigationError(message, [candidate], true)).toBe(
     true,
-  );
-  expect(isExpectedCleanupNavigationError(message, [candidate], false)).toBe(
-    false,
   );
   expect(
     isExpectedCleanupNavigationError(
       "[Agent-Native browser session] poll failed: TypeError: Load failed",
       [candidate],
-      false,
+      true,
+    ),
+  ).toBe(true);
+  expect(isExpectedCleanupNavigationError(message, [candidate], false)).toBe(
+    false,
+  );
+  expect(
+    isExpectedCleanupNavigationError(
+      message,
+      [{ ...candidate, requestWasPendingAtNavigation: false }],
+      true,
+    ),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupNavigationError(
+      message,
+      [{ ...candidate, ageMs: 9_000 }],
+      true,
+    ),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupNavigationError(
+      message,
+      [{ ...candidate, method: "GET" }],
+      true,
+    ),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupNavigationError(
+      message,
+      [candidate, { ...candidate, ageMs: 200 }],
+      true,
+    ),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupNavigationError(
+      message,
+      [{ ...candidate, competingRequestStartedAfterNavigation: true }],
+      true,
     ),
   ).toBe(false);
 });
