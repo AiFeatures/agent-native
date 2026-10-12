@@ -207,6 +207,7 @@ import { type GlslShaderPanelContext } from "./inspector/GlslShaderPanel";
 import type { LocalhostWriteConsentPayload } from "./LocalhostWriteConsentDialog";
 import { getActiveScreenIframeId } from "./multi-screen/iframe-targeting";
 import { requestDocumentColorCounts } from "./multi-screen/preview-parse-warmer";
+import type { SubtreeColorStylesRead } from "./multi-screen/read-portable-style-snapshot";
 import type { ScreenHeightMode } from "./multi-screen/screen-height";
 import {
   clampScreenDimension,
@@ -363,6 +364,7 @@ interface EditPanelProps {
   onSelectionColorTarget?: (color: string) => void;
   canSelectSelectionColorTarget?: (color: string) => boolean;
   onSelectionColorPickerOpenChange?: (from: string, open: boolean) => void;
+  readSubtreeColorStyles?: (element: ElementInfo) => SubtreeColorStylesRead;
   onGroupFillStylesChange?: (
     styles: Record<string, string>,
     meta?: StyleChangeMeta,
@@ -1872,6 +1874,7 @@ export function SelectionColorsProperties({
   onColorPickerOpenChange,
   colors: providedColors,
   title,
+  readSubtreeColorStyles,
 }: {
   elements: ElementInfo[];
   scopes?: SelectionColorScope[];
@@ -1881,14 +1884,21 @@ export function SelectionColorsProperties({
   onColorPickerOpenChange?: (from: string, open: boolean) => void;
   colors?: SelectionColorValue[];
   title?: string;
+  readSubtreeColorStyles?: (element: ElementInfo) => SubtreeColorStylesRead;
 }) {
   const [expanded, setExpanded] = useState(false);
   const t = useT();
   // Scoped reads never look at elements, which some callers rebuild per render.
   const colorElements = scopes?.length ? NO_SELECTION_ELEMENTS : elements;
   const colors = useMemo(
-    () => providedColors ?? selectionColorValues(colorElements, scopes),
-    [providedColors, colorElements, scopes],
+    () =>
+      providedColors ??
+      selectionColorValues(
+        colorElements,
+        scopes,
+        expanded ? readSubtreeColorStyles : undefined,
+      ),
+    [providedColors, colorElements, scopes, expanded, readSubtreeColorStyles],
   );
   const onColorPickerOpenChangeRef = useRef(onColorPickerOpenChange);
   onColorPickerOpenChangeRef.current = onColorPickerOpenChange;
@@ -2309,6 +2319,7 @@ export const EditPanel = memo(function EditPanel({
   onSelectionColorTarget,
   canSelectSelectionColorTarget,
   onSelectionColorPickerOpenChange,
+  readSubtreeColorStyles,
   onGroupFillStylesChange: onGroupFillStylesChangeProp,
   viewMode,
   mode,
@@ -3033,6 +3044,7 @@ export const EditPanel = memo(function EditPanel({
                         onStylesChange={onSelectedScreenStylesChange}
                         documentColorPalette={documentColorPalette}
                         glslShaderContext={screenGlslShaderContext}
+                        readSubtreeColorStyles={readSubtreeColorStyles}
                       />
                       <StrokeProperties
                         key={`stroke:${selectedScreenElementSectionKey}`}
@@ -3050,6 +3062,7 @@ export const EditPanel = memo(function EditPanel({
                       <SelectionColorsProperties
                         elements={selectedScreenElements}
                         scopes={selectionColorScopes}
+                        readSubtreeColorStyles={readSubtreeColorStyles}
                         onColorTarget={onSelectionColorTarget}
                         canSelectColorTarget={canSelectSelectionColorTarget}
                         onColorPickerOpenChange={
@@ -3198,6 +3211,7 @@ export const EditPanel = memo(function EditPanel({
                       motionKeyframeContext={motionKeyframeFieldContext}
                       breakpointOverrideContext={breakpointOverrideFieldContext}
                       hideAddFill={selectionIsTextOnly}
+                      readSubtreeColorStyles={readSubtreeColorStyles}
                     />
                   )}
                   <StrokeProperties
@@ -3219,6 +3233,7 @@ export const EditPanel = memo(function EditPanel({
                   <SelectionColorsProperties
                     elements={effectiveSelectedElements}
                     scopes={selectionColorScopes}
+                    readSubtreeColorStyles={readSubtreeColorStyles}
                     onColorTarget={onSelectionColorTarget}
                     canSelectColorTarget={canSelectSelectionColorTarget}
                     onColorPickerOpenChange={onSelectionColorPickerOpenChange}

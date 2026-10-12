@@ -63,6 +63,7 @@ import {
   flushCommitsOnInput,
 } from "../commit-after-paint";
 import {
+  clearAcknowledgedDesignDataOperationsThroughRevision,
   rebaseDesignDataWithPendingOperations,
   type PendingDesignDataOperations,
 } from "../data-operations";
@@ -97,6 +98,7 @@ import {
 import {
   classifyDesignSaveFailure,
   designSaveErrorMessage,
+  reportDesignSaveFailure,
 } from "../save-failure";
 import {
   designFileCodeLayerSource,
@@ -188,6 +190,8 @@ export function useEditorFilesAndSaving({
   );
   const pendingFrameGeometryOperationsForUnloadRef =
     useRef<PendingDesignDataOperations>({});
+  const frameGeometryOperationsInFlightRef =
+    useRef<PendingDesignDataOperations>({});
   const [showPrompt, setShowPrompt] = useState(false);
   const [showTweakPrompt, setShowTweakPrompt] = useState(false);
   const tweakPromptAnchorRef = useRef<HTMLElement | null>(null);
@@ -230,6 +234,26 @@ export function useEditorFilesAndSaving({
       id: "design-save-outbox-discarded",
     });
   }, [readOnlyWidget, t]);
+
+  const reportSaveFailure = useCallback(
+    (error: unknown) =>
+      reportDesignSaveFailure(error, navigator.onLine, {
+        warnChangesWillRetry,
+        showConflict: () => {
+          if (readOnlyWidget) return;
+          toast.error(t("designEditor.toasts.saveConflict"), {
+            id: "design-save-error",
+          });
+        },
+        showError: (message) => {
+          if (readOnlyWidget) return;
+          toast.error(message ?? t("common.genericError"), {
+            id: "design-save-error",
+          });
+        },
+      }),
+    [readOnlyWidget, t, warnChangesWillRetry],
+  );
 
   const journalOutboxEntry = useCallback(
     async (entry: DesignSaveOutboxEntry) => {
@@ -284,6 +308,16 @@ export function useEditorFilesAndSaving({
         ...result.rebased.map(({ entry }) => entry),
         ...result.dropped.map(({ entry }) => entry),
       ]) {
+        if (
+          entry.actionName === "update-design" &&
+          entry.operationSource === designSaveOperationSourceRef.current
+        ) {
+          frameGeometryOperationsInFlightRef.current =
+            clearAcknowledgedDesignDataOperationsThroughRevision(
+              frameGeometryOperationsInFlightRef.current,
+              entry.operationRevision,
+            );
+        }
         if (
           shouldClearLatestUnloadSaveForOutboxEntry(
             latestFileSaveForUnloadRef.current[entry.resourceId],
@@ -1022,8 +1056,14 @@ export function useEditorFilesAndSaving({
       }
     }
   }, [serverFiles]);
+  // A get-design response can predate a geometry save still in flight or
+  // queued for retry, so its operations stay on top of what the server sent.
   const designDataJson = useMemo(
-    () => parseDesignDataJson(design?.data),
+    () =>
+      rebaseDesignDataWithPendingOperations(
+        parseDesignDataJson(design?.data),
+        frameGeometryOperationsInFlightRef.current,
+      ),
     [design?.data],
   );
   const designSourceType = useMemo(
@@ -1550,6 +1590,7 @@ export function useEditorFilesAndSaving({
     setOptimisticFrameGeometryById,
     designSaveOperationSourceRef,
     pendingFrameGeometryOperationsForUnloadRef,
+    frameGeometryOperationsInFlightRef,
     showPrompt,
     showTweakPrompt,
     setShowTweakPrompt,
@@ -1565,7 +1606,7 @@ export function useEditorFilesAndSaving({
     fileSaveOperationRevisionRef,
     latestFileSaveForUnloadRef,
     fileSaveTimersRef,
-    warnChangesWillRetry,
+    reportSaveFailure,
     journalOutboxEntry,
     acknowledgeOutboxEntry,
     retryDesignSaveOutbox,
