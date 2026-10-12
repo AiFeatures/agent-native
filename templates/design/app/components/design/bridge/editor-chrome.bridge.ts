@@ -42,6 +42,7 @@ declare var __RUNTIME_LAYER_SNAPSHOT_ENABLED__: boolean;
 declare var __LIVE_REFLOW_ENABLED__: boolean;
 declare var __SELECTED_LAYER_DRAG_PRIORITY__: boolean;
 declare var __INITIAL_SOURCE_HEAD__: string;
+declare var __INITIAL_SOURCE_OWNERSHIP__: string;
 
 (function () {
   var readOnly = __READ_ONLY__;
@@ -4333,7 +4334,7 @@ declare var __INITIAL_SOURCE_HEAD__: string;
     return el.parentElement;
   }
 
-  function appliedContentOffset() {
+  function appliedContentOffset(): { x: number; y: number } | null {
     var offsetStyle = document.querySelector(
       "style[data-agent-native-content-offset]",
     );
@@ -4344,8 +4345,10 @@ declare var __INITIAL_SOURCE_HEAD__: string;
     var yAttribute = offsetStyle.getAttribute(
       "data-agent-native-content-offset-y",
     );
-    var x = xAttribute === null ? NaN : Number(xAttribute);
-    var y = yAttribute === null ? NaN : Number(yAttribute);
+    var x =
+      xAttribute === null || !xAttribute.trim() ? NaN : Number(xAttribute);
+    var y =
+      yAttribute === null || !yAttribute.trim() ? NaN : Number(yAttribute);
     var cssOffset =
       Number.isFinite(x) && Number.isFinite(y)
         ? { x: x, y: y }
@@ -4354,12 +4357,11 @@ declare var __INITIAL_SOURCE_HEAD__: string;
               /translate:\s*(-?(?:\d+(?:\.\d*)?|\.\d+))px\s+(-?(?:\d+(?:\.\d*)?|\.\d+))px/.exec(
                 offsetStyle.textContent || "",
               );
-            return match
-              ? { x: Number(match[1]), y: Number(match[2]) }
-              : { x: 0, y: 0 };
+            return match ? { x: Number(match[1]), y: Number(match[2]) } : null;
           })();
+    if (!cssOffset) return null;
     var body = document.body;
-    if (!body) return cssOffset;
+    if (!body) return null;
     var ancestorTransform = { a: 1, b: 0, c: 0, d: 1 };
     for (
       var ancestor: Element | null = body;
@@ -4371,10 +4373,13 @@ declare var __INITIAL_SOURCE_HEAD__: string;
         ancestorTransform,
       );
     }
-    return {
+    var offset = {
       x: ancestorTransform.a * cssOffset.x + ancestorTransform.c * cssOffset.y,
       y: ancestorTransform.b * cssOffset.x + ancestorTransform.d * cssOffset.y,
     };
+    return Number.isFinite(offset.x) && Number.isFinite(offset.y)
+      ? offset
+      : null;
   }
 
   function boardContentOffsetRootForElement(
@@ -4865,6 +4870,10 @@ declare var __INITIAL_SOURCE_HEAD__: string;
       } else {
         frame.remove();
         var fallbackHost = document.createElement("div");
+        fallbackHost.setAttribute(
+          "data-agent-native-edit-overlay",
+          "portable-style-probe",
+        );
         fallbackHost.setAttribute(
           "style",
           "all: initial !important;position: fixed !important;left: 0 !important;top: 0 !important;width: 0 !important;height: 0 !important;overflow: hidden !important;contain: strict !important;",
@@ -6720,16 +6729,21 @@ declare var __INITIAL_SOURCE_HEAD__: string;
     if (designParent && parentStyles) {
       positionComputedStylesCache.set(designParent, parentStyles);
     }
-    var positionCoordinateContext = positionContainingBlockForElement(
-      el,
-      positionComputedStylesCache,
-      positionRenderOffset,
-    );
-    var positionReferenceRect = positionReferenceRectForElement(
-      el,
-      cs.position === "fixed" && !positionCoordinateContext.hasContainingBlock,
-      positionRenderOffset,
-    );
+    var positionCoordinateContext = positionRenderOffset
+      ? positionContainingBlockForElement(
+          el,
+          positionComputedStylesCache,
+          positionRenderOffset,
+        )
+      : null;
+    var positionReferenceRect = positionCoordinateContext
+      ? positionReferenceRectForElement(
+          el,
+          cs.position === "fixed" &&
+            !positionCoordinateContext.hasContainingBlock,
+          positionRenderOffset,
+        )
+      : undefined;
     var authoredSizeStyles = collectAuthoredSizeStyles(el);
     var parentDisplay = parentStyles ? parentStyles.display : undefined;
     var runtimeOnlyClone = isRuntimeOnlyClone(el);
@@ -6843,9 +6857,14 @@ declare var __INITIAL_SOURCE_HEAD__: string;
       parentBoundingRect: designParent
         ? rectInfoForElement(designParent)
         : undefined,
-      positionReferenceRect: positionReferenceRect,
-      positionContainingBlockOrigin: positionCoordinateContext.origin,
-      positionContainingBlockTransform: positionCoordinateContext.transform,
+      ...(positionCoordinateContext && positionReferenceRect
+        ? {
+            positionReferenceRect: positionReferenceRect,
+            positionContainingBlockOrigin: positionCoordinateContext.origin,
+            positionContainingBlockTransform:
+              positionCoordinateContext.transform,
+          }
+        : {}),
       textContent: el.textContent ? el.textContent.slice(0, 200) : undefined,
       textContentTruncated: el.textContent
         ? el.textContent.length > 200
@@ -8515,6 +8534,50 @@ declare var __INITIAL_SOURCE_HEAD__: string;
     style: string;
   }
 
+  interface InitialSourceOwnership {
+    body: SourceMeta;
+    sourceNodeIds: string[];
+    nodes: Array<{
+      nodeId: string;
+      tagName: string;
+      meta: SourceMeta;
+    }>;
+  }
+
+  function readInitialSourceOwnership(): InitialSourceOwnership | null {
+    try {
+      var serialized =
+        typeof __INITIAL_SOURCE_OWNERSHIP__ === "string"
+          ? __INITIAL_SOURCE_OWNERSHIP__
+          : "";
+      if (!serialized) return null;
+      var snapshot = JSON.parse(serialized) as InitialSourceOwnership;
+      if (
+        !snapshot ||
+        !snapshot.body ||
+        !Array.isArray(snapshot.body.attrs) ||
+        typeof snapshot.body.className !== "string" ||
+        typeof snapshot.body.style !== "string" ||
+        !Array.isArray(snapshot.sourceNodeIds) ||
+        !Array.isArray(snapshot.nodes)
+      ) {
+        return null;
+      }
+      return snapshot;
+    } catch (_error) {
+      console.warn("Design could not read initial source ownership");
+      return null;
+    }
+  }
+
+  function copySourceMeta(meta: SourceMeta): SourceMeta {
+    return {
+      attrs: meta.attrs.slice(),
+      className: meta.className,
+      style: meta.style,
+    };
+  }
+
   function sourceMetaFor(element: Element): SourceMeta | undefined {
     return (element as Element & { __anSourceMeta?: SourceMeta })
       .__anSourceMeta;
@@ -8633,7 +8696,83 @@ declare var __INITIAL_SOURCE_HEAD__: string;
   }
 
   function captureInitialSourceOwnership(): void {
-    if (document.body) recordSourceSubtree(document.body);
+    var body = document.body;
+    if (!body) return;
+    recordSourceSubtree(body);
+
+    var snapshot = readInitialSourceOwnership();
+    if (!snapshot) return;
+
+    if (isSourceOwned(body)) {
+      (body as Element & { __anSourceMeta?: SourceMeta }).__anSourceMeta =
+        copySourceMeta(snapshot.body);
+    }
+
+    var sourceNodeIds = new Set(snapshot.sourceNodeIds);
+    var sourceNodes = new Map<string, { tagName: string; meta: SourceMeta }>();
+    snapshot.nodes.forEach(function (entry) {
+      if (
+        entry &&
+        typeof entry.nodeId === "string" &&
+        typeof entry.tagName === "string" &&
+        entry.meta &&
+        Array.isArray(entry.meta.attrs) &&
+        typeof entry.meta.className === "string" &&
+        typeof entry.meta.style === "string" &&
+        !sourceNodes.has(entry.nodeId)
+      ) {
+        sourceNodes.set(entry.nodeId, {
+          tagName: entry.tagName,
+          meta: entry.meta,
+        });
+      }
+    });
+
+    var liveNodes = new Map<string, Element[]>();
+    function collectLiveSourceElements(root: Node): void {
+      if (root.nodeType !== 1) return;
+      var element = root as Element;
+      if (isTemplateCloneElement(element)) return;
+      var nodeId = element.getAttribute("data-agent-native-node-id");
+      if (nodeId) {
+        var matches = liveNodes.get(nodeId);
+        if (matches) matches.push(element);
+        else liveNodes.set(nodeId, [element]);
+      }
+      var template = templateContentOf(element);
+      var children = template ? template.childNodes : element.childNodes;
+      for (var i = 0; i < children.length; i += 1) {
+        collectLiveSourceElements(children[i]!);
+      }
+    }
+    collectLiveSourceElements(body);
+
+    liveNodes.forEach(function (elements, nodeId) {
+      if (sourceNodeIds.has(nodeId)) return;
+      elements.forEach(function (element) {
+        var owner = element as Element & {
+          __anSource?: boolean;
+          __anSourceMeta?: SourceMeta;
+        };
+        delete owner.__anSource;
+        delete owner.__anSourceMeta;
+      });
+    });
+
+    sourceNodes.forEach(function (entry, nodeId) {
+      var matches = liveNodes.get(nodeId);
+      if (!matches || matches.length !== 1) return;
+      var element = matches[0]!;
+      if (
+        !isSourceOwned(element) ||
+        isTemplateCloneElement(element) ||
+        element.tagName.toLowerCase() !== entry.tagName
+      ) {
+        return;
+      }
+      (element as Element & { __anSourceMeta?: SourceMeta }).__anSourceMeta =
+        copySourceMeta(entry.meta);
+    });
   }
 
   function classTokens(value: string): string[] {
@@ -18185,6 +18324,113 @@ declare var __INITIAL_SOURCE_HEAD__: string;
     return size.width >= sourceWidth && size.height >= sourceHeight;
   }
 
+  function dropCanGrowContentSizedAutoLayout(
+    container: Element,
+    sourceWidth: number,
+    sourceHeight: number,
+  ): boolean {
+    var html = container as HTMLElement;
+    var elementStyle = html.style;
+    var computedStyle = window.getComputedStyle(container);
+    if (
+      computedStyle.display !== "flex" &&
+      computedStyle.display !== "inline-flex"
+    ) {
+      return false;
+    }
+    var currentSize = dropContentSize(container);
+    var rect = container.getBoundingClientRect();
+    function computedPixels(value: string | undefined): number | undefined {
+      var match = /^\s*(\d+(?:\.\d+)?)px\s*$/i.exec(String(value || ""));
+      var parsed = match?.[1] ? Number(match[1]) : Number.NaN;
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    function contentCapacity(cssPixels: number, axis: "width" | "height") {
+      var scale =
+        axis === "width"
+          ? html.offsetWidth
+            ? rect.width / html.offsetWidth
+            : 1
+          : html.offsetHeight
+            ? rect.height / html.offsetHeight
+            : 1;
+      var insets = 0;
+      if (computedStyle.boxSizing === "border-box") {
+        var paddingBefore = computedPixels(
+          axis === "width"
+            ? computedStyle.paddingLeft
+            : computedStyle.paddingTop,
+        );
+        var paddingAfter = computedPixels(
+          axis === "width"
+            ? computedStyle.paddingRight
+            : computedStyle.paddingBottom,
+        );
+        var borderBefore = computedPixels(
+          axis === "width"
+            ? computedStyle.borderLeftWidth
+            : computedStyle.borderTopWidth,
+        );
+        var borderAfter = computedPixels(
+          axis === "width"
+            ? computedStyle.borderRightWidth
+            : computedStyle.borderBottomWidth,
+        );
+        if (
+          paddingBefore === undefined ||
+          paddingAfter === undefined ||
+          borderBefore === undefined ||
+          borderAfter === undefined
+        ) {
+          return -1;
+        }
+        insets = paddingBefore + paddingAfter + borderBefore + borderAfter;
+      }
+      return Math.max(0, cssPixels - insets) * scale;
+    }
+    function axisCanGrow(
+      axis: "width" | "height",
+      required: number,
+      current: number,
+    ): boolean {
+      if (current >= required) return true;
+      var authored = String(elementStyle[axis] || "")
+        .trim()
+        .toLowerCase();
+      var fitContentArgument = /^fit-content\((.+)\)$/.exec(authored);
+      if (
+        authored !== "fit-content" &&
+        authored !== "max-content" &&
+        !fitContentArgument
+      ) {
+        return false;
+      }
+      if (fitContentArgument) {
+        var fitLimit = computedPixels(fitContentArgument[1]);
+        if (
+          fitLimit === undefined ||
+          contentCapacity(fitLimit, axis) < required
+        ) {
+          return false;
+        }
+      }
+      var maxProperty: "maxWidth" | "maxHeight" =
+        axis === "width" ? "maxWidth" : "maxHeight";
+      var maximum = String(computedStyle[maxProperty] || "none")
+        .trim()
+        .toLowerCase();
+      if (!maximum || maximum === "none") return true;
+      var maxPixels = computedPixels(maximum);
+      return Boolean(
+        maxPixels !== undefined && contentCapacity(maxPixels, axis) >= required,
+      );
+    }
+    return (
+      axisCanGrow("width", sourceWidth, currentSize.width) &&
+      axisCanGrow("height", sourceHeight, currentSize.height)
+    );
+  }
+
   function dropFitsAutoLayoutFallback(
     container: Element,
     sourceWidth: number,
@@ -18192,7 +18438,12 @@ declare var __INITIAL_SOURCE_HEAD__: string;
   ): boolean {
     // Direct targets fit both axes; only ancestor fallback may use flex's main
     // axis.
-    if (dropFitsContainer(container, sourceWidth, sourceHeight)) return true;
+    if (
+      dropFitsContainer(container, sourceWidth, sourceHeight) ||
+      dropCanGrowContentSizedAutoLayout(container, sourceWidth, sourceHeight)
+    ) {
+      return true;
+    }
     var style = window.getComputedStyle(container);
     var singleLineFlex =
       (style.display === "flex" || style.display === "inline-flex") &&
@@ -23767,6 +24018,11 @@ declare var __INITIAL_SOURCE_HEAD__: string;
       var crect = container.getBoundingClientRect();
       if (
         dropFitsContainer(
+          container,
+          dragElStartRect.width,
+          dragElStartRect.height,
+        ) ||
+        dropCanGrowContentSizedAutoLayout(
           container,
           dragElStartRect.width,
           dragElStartRect.height,

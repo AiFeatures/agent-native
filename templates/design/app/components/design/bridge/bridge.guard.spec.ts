@@ -336,6 +336,7 @@ describe("bridge oversized-drop receiver guards", () => {
       sourceSize,
       expected,
     }) => {
+      // source-read-ok: Execute both embedded bridge implementations, which expose no module API.
       const dropFitsAutoLayoutFallback = compileBridgeFunction<
         (
           container: Element,
@@ -347,6 +348,7 @@ describe("bridge oversized-drop receiver guards", () => {
         nextFunction,
         {
           dropFitsContainer: () => false,
+          dropCanGrowContentSizedAutoLayout: () => false,
           dropContentSize: () => containerSize,
           window: { getComputedStyle: () => style },
         },
@@ -432,6 +434,7 @@ describe("bridge oversized-drop receiver guards", () => {
       isAbsolutePrimitiveContainer: () => false,
       isFreeformRelativeContainer: () => false,
       dropFitsContainer: (element: Element) => element === body,
+      dropCanGrowContentSizedAutoLayout: () => false,
       dropFitsAutoLayoutFallback: () => false,
       parentFlowAxis: () => "y",
       nearestChildInsertionTarget,
