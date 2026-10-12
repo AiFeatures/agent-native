@@ -103,6 +103,100 @@ export const AUTHORING_FUZZ_STYLE_PROPERTIES = [
   "grid-template-rows",
 ];
 
+export function authoringFuzzBrowserSessionResponse(
+  method: string,
+  pathname: string,
+  requestBody?: unknown,
+): { ok: boolean; [key: string]: unknown } | null {
+  const basePath = "/_agent-native/browser-sessions";
+  const body =
+    requestBody && typeof requestBody === "object"
+      ? (requestBody as Record<string, unknown>)
+      : {};
+  const registration =
+    method === "POST" &&
+    (pathname === basePath ||
+      /^\/_agent-native\/browser-sessions\/[^/]+\/heartbeat$/.test(pathname));
+  if (registration) {
+    const sessionIdFromPath = pathname.match(
+      /^\/_agent-native\/browser-sessions\/([^/]+)\/heartbeat$/,
+    )?.[1];
+    const nestedSession =
+      body.session && typeof body.session === "object"
+        ? (body.session as Record<string, unknown>)
+        : {};
+    const sessionId =
+      sessionIdFromPath ??
+      (typeof body.sessionId === "string" ? body.sessionId : undefined) ??
+      (typeof nestedSession.id === "string" ? nestedSession.id : undefined);
+    if (!sessionId) {
+      return {
+        ok: false,
+        error: "Browser-session registration omitted its id",
+      };
+    }
+
+    const now = Date.now();
+    const session = {
+      sessionId,
+      session: { ...nestedSession, id: sessionId },
+      actions: Array.isArray(body.actions) ? body.actions : [],
+      ...(Array.isArray(body.webmcpTools)
+        ? { webmcpTools: body.webmcpTools }
+        : {}),
+      connectedAt: now,
+      lastSeenAt: now,
+      expiresAt: now + 60_000,
+      active: true,
+    };
+    return { ok: true, session };
+  }
+
+  if (
+    method === "POST" &&
+    /^\/_agent-native\/browser-sessions\/[^/]+\/requests\/claim$/.test(pathname)
+  ) {
+    return { ok: true, request: null };
+  }
+
+  if (
+    method === "DELETE" &&
+    /^\/_agent-native\/browser-sessions\/[^/]+$/.test(pathname)
+  ) {
+    return { ok: true, deleted: true };
+  }
+
+  if (method === "GET" && pathname === basePath) {
+    return { ok: true, sessions: [] };
+  }
+
+  return null;
+}
+
+export function authoringFuzzBrowserSessionCorsHeaders(
+  origin?: string,
+): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": origin ?? "*",
+    "Access-Control-Allow-Methods": "GET,HEAD,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,X-Agent-Native-CSRF",
+    ...(origin ? { Vary: "Origin" } : {}),
+    ...(origin && origin !== "null"
+      ? { "Access-Control-Allow-Credentials": "true" }
+      : {}),
+  };
+}
+
+export function recordCleanupRequestOutcome(
+  finishedAt: WeakMap<object, number>,
+  request: object,
+  outcome: "finished" | "failed",
+  at: number,
+) {
+  if (outcome === "finished") finishedAt.set(request, at);
+  else finishedAt.delete(request);
+}
+
 type Page = any;
 type Locator = any;
 type ScrollBox = {
@@ -243,17 +337,25 @@ type WatchedRequestNavigationCandidate = {
   ageMs: number;
   settledAgeMs?: number;
   requestWasPendingAtNavigation?: boolean;
+  requestFinishedSuccessfully?: boolean;
   competingRequestStartedAfterNavigation?: boolean;
   competingClaimStartedAfterNavigation?: boolean;
+  competingRegistrationStartedAfterNavigation?: boolean;
 };
 
 function isExpectedWatchedRequestNavigationAbort(
   candidate: WatchedRequestNavigationCandidate,
   rules: readonly SaveReloadRequestAbortRule[],
+  allowFinishedRequestGrace = false,
 ) {
   return (
     candidate.requestWasPendingAtNavigation === true &&
     candidate.competingRequestStartedAfterNavigation !== true &&
+    (candidate.requestFinishedSuccessfully !== true ||
+      (allowFinishedRequestGrace &&
+        candidate.settledAgeMs !== undefined &&
+        candidate.settledAgeMs >= 0 &&
+        candidate.settledAgeMs < reloadNavigationConsoleGraceMs)) &&
     candidate.ageMs >= 0 &&
     candidate.ageMs < reloadNavigationAbortMaxRequestAgeMs &&
     (candidate.settledAgeMs === undefined ||
@@ -291,7 +393,11 @@ export function isExpectedWatchedRequestCorsError(
     candidates.filter(
       (candidate) =>
         candidate.url === match[1] &&
-        isExpectedWatchedRequestNavigationAbort(candidate, rules),
+        isExpectedWatchedRequestNavigationAbort(
+          candidate,
+          rules,
+          activePhase === "save/reload",
+        ),
     ).length === 1
   );
 }
@@ -391,6 +497,10 @@ export function isExpectedCleanupBrowserSessionHeartbeatConsoleError(
   return (
     message ===
       "[Agent-Native browser session] heartbeat failed: TypeError: Load failed" &&
+    !candidates.some(
+      (candidate) =>
+        candidate.competingRegistrationStartedAfterNavigation === true,
+    ) &&
     hasExactlyOneExpectedBrowserSessionAbort(candidates, [
       browserSessionRegistrationRequestRule,
     ])
@@ -422,7 +532,10 @@ export function isExpectedSaveReloadWatchedRequestCorsConsoleError(
     pathname: string;
     method: string;
     ageMs: number;
+    settledAgeMs?: number;
     requestWasPendingAtReloadNavigation?: boolean;
+    requestFinishedSuccessfully?: boolean;
+    competingRequestStartedAfterNavigation?: boolean;
   }>,
 ) {
   if (activePhase !== "save/reload") return false;
@@ -1038,7 +1151,11 @@ export async function runAuthoringFuzz(
   const watchedRequests = new Map(options.initialPendingWatchedRequests);
   const reloadNavigationRequests = new Map<
     any,
-    { startedAt: number; settledAt: number | null }
+    {
+      startedAt: number;
+      settledAt: number | null;
+      finishedSuccessfully: boolean;
+    }
   >();
   let reloadNavigationStartedAt: number | null = null;
   // Diagnostic only: reloadNavigationStartedAt resets after each reload, but a
@@ -1076,7 +1193,7 @@ export async function runAuthoringFuzz(
     const now = Date.now();
     const reloadNavigationCandidates = [
       ...reloadNavigationRequests.entries(),
-    ].map(([request, { startedAt, settledAt }]) => {
+    ].map(([request, { startedAt, settledAt, finishedSuccessfully }]) => {
       const url = request.url();
       return {
         url,
@@ -1084,6 +1201,7 @@ export async function runAuthoringFuzz(
         method: request.method(),
         ageMs: now - startedAt,
         ...(settledAt === null ? {} : { settledAgeMs: now - settledAt }),
+        requestFinishedSuccessfully: finishedSuccessfully,
         requestWasPendingAtNavigation: true,
       };
     });
@@ -1177,7 +1295,10 @@ export async function runAuthoringFuzz(
       )
     ) {
       const candidate = reloadNavigationRequests.get(request);
-      if (candidate) candidate.settledAt = Date.now();
+      if (candidate) {
+        candidate.settledAt = Date.now();
+        candidate.finishedSuccessfully = false;
+      }
       return;
     }
     reloadNavigationRequests.delete(request);
@@ -1213,7 +1334,11 @@ export async function runAuthoringFuzz(
         reloadNavigationAbortMaxRequestAgeMs &&
       isBrowserSessionPath(requestUrl.pathname)
     ) {
-      reloadNavigationRequests.set(request, { startedAt, settledAt: null });
+      reloadNavigationRequests.set(request, {
+        startedAt,
+        settledAt: null,
+        finishedSuccessfully: false,
+      });
     }
     if (!traceEnabled) return;
     pendingRequests.set(request, {
@@ -1237,7 +1362,10 @@ export async function runAuthoringFuzz(
     watchedRequests.delete(request);
     const candidate = reloadNavigationRequests.get(request);
     // WebKit can deliver the fetch error after Playwright's requestfinished event.
-    if (candidate) candidate.settledAt = Date.now();
+    if (candidate) {
+      candidate.settledAt = Date.now();
+      candidate.finishedSuccessfully = true;
+    }
   };
   const onResponse = (response: any) => {
     if (traceEnabled) {
@@ -4973,7 +5101,11 @@ export async function runAuthoringFuzz(
       reloadNavigationStartedAt = Date.now();
       lastReloadStartedAt = reloadNavigationStartedAt;
       for (const [request, startedAt] of watchedRequests.entries()) {
-        reloadNavigationRequests.set(request, { startedAt, settledAt: null });
+        reloadNavigationRequests.set(request, {
+          startedAt,
+          settledAt: null,
+          finishedSuccessfully: false,
+        });
         if (traceEnabled) {
           console.log(
             `[edit-fidelity] reload pending ${request.method()} ${new URL(request.url()).pathname} ageMs=${Date.now() - startedAt}`,

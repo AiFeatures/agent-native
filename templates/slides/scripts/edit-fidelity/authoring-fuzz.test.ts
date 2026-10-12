@@ -6,9 +6,12 @@ import {
   assertShortcutMarkupAdded,
   assertSlideIsScaled,
   AUTHORING_FUZZ_STYLE_PROPERTIES,
+  authoringFuzzBrowserSessionCorsHeaders,
+  authoringFuzzBrowserSessionResponse,
   authoringFuzzLineNavigationKeys,
   authoringFuzzProfileIndex,
   authoringFuzzUnavailableExitCode,
+  recordCleanupRequestOutcome,
   canonicalizeAuthoringFuzzPersistence,
   createAuthoringFuzzPlan,
   formatAuthoringFuzzCleanupIssue,
@@ -954,6 +957,105 @@ it("captures failed browser-session registration and subroute requests", () => {
   expect(isBrowserSessionPath("/_agent-native/actions/patch-deck")).toBe(false);
 });
 
+it("isolates authoring fuzz from the unrelated browser-session service", () => {
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "POST",
+      "/_agent-native/browser-sessions",
+      {
+        sessionId: "fuzz-session",
+        session: { id: "fuzz-session", label: "fuzz" },
+        actions: [],
+      },
+    ),
+  ).toMatchObject({
+    ok: true,
+    session: {
+      sessionId: "fuzz-session",
+      session: { id: "fuzz-session", label: "fuzz" },
+      actions: [],
+      active: true,
+    },
+  });
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "POST",
+      "/_agent-native/browser-sessions/fuzz-session/heartbeat",
+      { session: { label: "fuzz" } },
+    ),
+  ).toMatchObject({ ok: true, session: { sessionId: "fuzz-session" } });
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "POST",
+      "/_agent-native/browser-sessions/fuzz-session/requests/claim",
+      {},
+    ),
+  ).toEqual({ ok: true, request: null });
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "DELETE",
+      "/_agent-native/browser-sessions/fuzz-session",
+    ),
+  ).toEqual({ ok: true, deleted: true });
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "POST",
+      "/_agent-native/browser-sessions/fuzz-session/requests/complete",
+      {},
+    ),
+  ).toBeNull();
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "GET",
+      "/_agent-native/browser-sessions/fuzz-session",
+    ),
+  ).toBeNull();
+  expect(
+    authoringFuzzBrowserSessionResponse(
+      "POST",
+      "/_agent-native/browser-sessions",
+      {},
+    ),
+  ).toEqual({
+    ok: false,
+    error: "Browser-session registration omitted its id",
+  });
+});
+
+it("mirrors browser-session CORS for fuzz-only responses and preflights", () => {
+  expect(
+    authoringFuzzBrowserSessionCorsHeaders("http://localhost:5173"),
+  ).toEqual({
+    "Access-Control-Allow-Origin": "http://localhost:5173",
+    "Access-Control-Allow-Methods": "GET,HEAD,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,X-Agent-Native-CSRF",
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
+  });
+  expect(authoringFuzzBrowserSessionCorsHeaders()).toEqual({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,HEAD,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,X-Agent-Native-CSRF",
+  });
+  expect(authoringFuzzBrowserSessionCorsHeaders("null")).toEqual({
+    "Access-Control-Allow-Origin": "null",
+    "Access-Control-Allow-Methods": "GET,HEAD,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,X-Agent-Native-CSRF",
+    Vary: "Origin",
+  });
+});
+
+it("clears a cleanup finish marker when the same request later fails", () => {
+  const finishedAt = new WeakMap<object, number>();
+  const request = {};
+
+  recordCleanupRequestOutcome(finishedAt, request, "finished", 10);
+  expect(finishedAt.get(request)).toBe(10);
+
+  recordCleanupRequestOutcome(finishedAt, request, "failed", 20);
+  expect(finishedAt.has(request)).toBe(false);
+});
+
 it("ignores registration aborts only when reload navigation cancels an in-flight request", () => {
   for (const errorText of [
     "Load request cancelled",
@@ -1190,6 +1292,24 @@ it("ignores only WebKit CORS console errors for requests canceled by reload", ()
     ]),
   ).toBe(true);
   expect(
+    isExpectedSaveReloadWatchedRequestCorsConsoleError(message, "save/reload", [
+      {
+        ...candidate,
+        requestFinishedSuccessfully: true,
+        settledAgeMs: 13,
+      },
+    ]),
+  ).toBe(true);
+  expect(
+    isExpectedSaveReloadWatchedRequestCorsConsoleError(message, "save/reload", [
+      {
+        ...candidate,
+        requestFinishedSuccessfully: true,
+        settledAgeMs: 1_000,
+      },
+    ]),
+  ).toBe(false);
+  expect(
     isExpectedSaveReloadWatchedRequestCorsConsoleError(
       `${message}\n    at fetch (native)`,
       "save/reload",
@@ -1278,6 +1398,11 @@ it("ignores only an in-flight browser-session claim canceled by cleanup navigati
       { ...candidate, competingClaimStartedAfterNavigation: true },
     ]),
   ).toBe(true);
+  expect(
+    isExpectedWatchedRequestCorsError(message, "cleanup/navigation", [
+      { ...candidate, requestFinishedSuccessfully: true },
+    ]),
+  ).toBe(false);
   expect(
     isExpectedWatchedRequestCorsError(message, "cleanup/navigation", [
       { ...candidate, competingRequestStartedAfterNavigation: true },
@@ -1395,6 +1520,15 @@ it("ignores browser-session poll or heartbeat errors only for matching canceled 
       { ...claimCandidate, settledAgeMs: 13 },
     ]),
   ).toBe(true);
+  expect(
+    isExpectedSaveReloadBrowserSessionConsoleError(pollWarning, "save/reload", [
+      {
+        ...claimCandidate,
+        requestFinishedSuccessfully: true,
+        settledAgeMs: 13,
+      },
+    ]),
+  ).toBe(false);
   expect(
     isExpectedSaveReloadBrowserSessionConsoleError(
       heartbeatWarning,
@@ -1634,6 +1768,16 @@ it("ignores cleanup heartbeat failures only for a matching canceled registration
   expect(
     isExpectedCleanupBrowserSessionHeartbeatConsoleError(warning, [candidate]),
   ).toBe(true);
+  expect(
+    isExpectedCleanupBrowserSessionHeartbeatConsoleError(warning, [
+      { ...candidate, competingRegistrationStartedAfterNavigation: true },
+    ]),
+  ).toBe(false);
+  expect(
+    isExpectedCleanupBrowserSessionHeartbeatConsoleError(warning, [
+      { ...candidate, requestFinishedSuccessfully: true },
+    ]),
+  ).toBe(false);
   expect(isExpectedCleanupNavigationError(warning, [candidate], true)).toBe(
     true,
   );
