@@ -5,7 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { appPath } from "./helpers";
+import { appPath, openAppMenuSubmenu } from "./helpers";
 
 const BASE_URL =
   process.env.E2E_BASE_URL ??
@@ -492,6 +492,8 @@ test("vector stroke gradient is visible, persisted, undoable, and reloadable", a
       })
       .toContain("data-an-vector-stroke-gradient");
 
+    await page.keyboard.press("Escape");
+    await expect(page.locator(`[id="${strokePopoverId}"]`)).toHaveCount(0);
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
     });
@@ -757,10 +759,10 @@ test("vector fill gradient renders in the inspector, source, SVG and PNG exports
     expect(savedSource).toContain('id="draft-pen-board-1-stroke-gradient"');
     expect(savedSource).toContain('id="draft-pen-board-1-fill-gradient"');
 
-    await page.getByRole("button", { name: "More", exact: true }).click();
+    await openAppMenuSubmenu(page, "File");
     const exportMenu = page.getByRole("menuitem", { name: "Export" });
     await expect(exportMenu).toBeVisible();
-    await exportMenu.press("ArrowRight");
+    await exportMenu.click();
     await expect(
       page.getByRole("menuitem", { name: "Download for Figma (SVG)" }),
     ).toBeVisible();
