@@ -288,6 +288,12 @@ export {
   loadResourcesForPrompt,
   type AgentChatPluginOptions,
 } from "./agent-chat-plugin.js";
+export type {
+  AgentChatAdditionalActionsDetails,
+  AgentChatAdditionalActionsExternalSurface,
+  AgentChatAdditionalActionsSurface,
+  ResolveAgentChatAdditionalActions,
+} from "./agent-chat/additional-actions.js";
 export {
   buildFrameworkPrompts,
   generateActionsPrompt,
