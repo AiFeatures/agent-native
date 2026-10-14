@@ -51,6 +51,83 @@ export default {
     moveDashboard: "Mover panel",
     folderCreateFailed: "No se ha podido crear la carpeta",
     moveFailed: "No se ha podido mover el panel",
+    previewSigma: "Vista previa de Sigma",
+    sigmaConnection: "Conexión de Sigma",
+    sigmaConnectedTo: "Conectado a {{name}}",
+    sigmaChooseConnection: "Conexión de Sigma",
+    sigmaChooseConnectionPlaceholder: "Elige una conexión",
+    sigmaChooseConnectionDescription:
+      "Elige el espacio de trabajo de Sigma para ver sus libros de trabajo.",
+    sigmaNoConnection: "Sigma no está conectado",
+    sigmaNoConnectionDescription:
+      "Abre Dispatch y pídele que conecte Sigma con Analytics. Las credenciales permanecen en Vault.",
+    sigmaOpenDispatch: "Configurar en Dispatch",
+    sigmaWorkbooksLoadFailed:
+      "No se han podido cargar los libros de trabajo de Sigma",
+    sigmaRetryConnection: "Comprueba la conexión e inténtalo de nuevo.",
+    sigmaRetry: "Reintentar",
+    sigmaNoWorkbooks: "No hay libros de trabajo de Sigma disponibles.",
+    sigmaWorkbook: "Libro de trabajo",
+    sigmaChooseWorkbook: "Elige un libro de trabajo",
+    sigmaStatusNotImported: "No importado",
+    sigmaStatusImporting: "Importando",
+    sigmaStatusImported: "Importado",
+    sigmaStatusFailed: "Error al importar",
+    sigmaArchived: "Archivado",
+    sigmaPreviewTitle: "Vista previa del libro de trabajo",
+    sigmaPreviewFailed: "No se ha podido previsualizar este libro de trabajo",
+    sigmaRetryPreview: "Vuelve a intentar cargar la vista previa.",
+    sigmaImportableCount: "{{count}} importables",
+    sigmaUnsupportedCount: "{{count}} no compatibles",
+    sigmaImportable: "Importable",
+    sigmaUnsupported: "No compatible",
+    sigmaNoElements: "No se han encontrado elementos en este libro de trabajo.",
+    sigmaPreviewOnly:
+      "Solo vista previa por ahora: Sigma no proporciona una asignación de proyecto de BigQuery que Analytics pueda verificar. La importación seguirá desactivada hasta que esa asignación esté disponible.",
+    sigmaPreviewTruncated: "Se muestran {{shown}} de {{total}} elementos.",
+    sigmaImportWorkbook: "Importar libro de trabajo",
+    sigmaImporting: "Importando libro de trabajo…",
+    sigmaImportInProgress:
+      "Ya hay una importación de este libro de trabajo en curso.",
+    sigmaMigrationFailed:
+      "No se ha podido importar este libro de trabajo. Inténtalo de nuevo.",
+    sigmaMigrationResultInvalid:
+      "La respuesta de importación estaba incompleta. Vuelve a cargar la lista de libros para comprobar su estado.",
+    sigmaImportComplete: "Panel creado",
+    sigmaImportSummary:
+      "Se han importado {{imported}} elementos; los {{unsupported}} no compatibles se conservan como avisos de revisión.",
+    sigmaAlreadyImported: "Este libro de trabajo ya se ha importado.",
+    sigmaImportedNoDashboard:
+      "El panel se importó, pero no se puede abrir desde esta cuenta.",
+    sigmaReviewRequiredCount: "{{count}} requieren revisión",
+    sigmaBetaRepresentationWarning:
+      "Esta importación beta puede representar algunas visualizaciones de forma distinta a Sigma.",
+    sigmaReasonUnsupportedElement:
+      "Este tipo de elemento no se admite para la importación.",
+    sigmaReasonUnsupportedSource:
+      "Este elemento usa una fuente que no se admite para la importación.",
+    sigmaReasonSourceMappingRequired:
+      "Sigma no proporciona una asignación de proyecto de BigQuery que Analytics pueda verificar, así que todavía no se puede importar este SQL.",
+    sigmaReasonSourceUnavailable:
+      "Sigma no permitió acceder a esta conexión de origen. Revisa sus permisos.",
+    sigmaReasonQueryUnavailable:
+      "Sigma no devolvió una consulta importable para este elemento.",
+    sigmaReasonUnsafeSql:
+      "Este patrón de consulta no se puede importar de forma segura.",
+    sigmaReasonVisualizationReview:
+      "Se pueden importar los datos, pero revisa la visualización después.",
+    sigmaRetryOwnerOnly:
+      "Solo quien inició esta importación puede volver a intentarla.",
+    sigmaImportedByTeammate: "Importado por un compañero",
+    sigmaFlaggedCount: "{{count}} marcados para revisión",
+    sigmaMoreWorkbooksFailed: "No se pudieron cargar más libros de trabajo",
+    sigmaLoadingMore: "Cargando libros de trabajo…",
+    sigmaLoadMore: "Cargar más libros de trabajo",
+    sigmaOpenDashboard: "Abrir panel",
+    sigmaReviewWithAgent: "Revisar con el agente",
+    sigmaReviewContext: "Panel importado desde Sigma",
+    sigmaReviewPrompt:
+      "Revisa el panel importado desde Sigma {{name}}. Comprueba los paneles importados y los elementos no compatibles, y sugiere las correcciones necesarias.",
   },
   sidebar: {
     collapseSidebar: "Contraer barra lateral",

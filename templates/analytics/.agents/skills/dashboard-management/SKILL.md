@@ -235,6 +235,28 @@ catalog template. Existing dashboards remain readable while the native
 replacement is validated. Bespoke interaction flows, arbitrary layouts, and
 visualizations outside these contracts may remain Custom Blocks.
 
+## Sigma workbook preview
+
+The Sigma workbook flow is preview-only until Analytics can verify the source
+project mapping. The current Sigma connection API reports provider type and
+metadata but does not expose a BigQuery project identifier, so inspection blocks
+all Sigma BigQuery SQL and the import action stays hidden from the agent and
+disabled in the UI. Do not call `migrate-sigma-workbook` or treat an Analytics
+BigQuery credential as proof that it targets the Sigma project. Users can list
+workbooks with `list-sigma-workbooks` and preview one with
+`inspect-sigma-workbook`. The feature is controlled by
+`analytics.sigma-dashboard-migration` and requires a granted Sigma connection.
+The Dispatch setup link can create a Sigma workspace connection from
+Vault-backed client ID and client secret references and grant Analytics access;
+never copy their values into Analytics settings.
+
+If Sigma adds verifiable source mapping in the future, the planned import will
+create a private snapshot in the user's personal `Sigma` folder. Other source
+types and unsupported elements will become review callouts. Preserve migration
+warnings and never describe a future result as parity-complete or automatically
+synchronized. Sigma's workbook-code API is public Beta and can omit unsupported
+workbook features before inspection receives the response.
+
 The source tree ships four provider-free v2 manifests in
 `server/lib/native-v2-dashboards.ts`: Customer ROI, Account Engagement,
 Cross-sell, and Win / Loss. They intentionally contain no customer names,
