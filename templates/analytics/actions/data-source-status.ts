@@ -61,6 +61,21 @@ function summarizeWorkspaceConnections(
   });
 }
 
+function workspaceConnectionsForProviderStatus(
+  providerId: string,
+  connections: SerializedWorkspaceConnection[],
+  userEmail: string,
+): SerializedWorkspaceConnection[] {
+  if (providerId !== "bigquery") return connections;
+  const ownerEmail = userEmail.trim().toLowerCase();
+  return connections.filter(
+    (connection) =>
+      connection.provider !== "bigquery" ||
+      connection.config.credentialMode !== "oauth" ||
+      connection.ownerEmail.trim().toLowerCase() === ownerEmail,
+  );
+}
+
 async function listWorkspaceConnectionsForStatus(): Promise<{
   connections: SerializedWorkspaceConnection[];
   grants: SerializedWorkspaceConnectionGrant[];
@@ -139,7 +154,11 @@ export default defineAction({
           catalogProvider?.recommendedTemplateUses.includes(APP_ID) ?? false,
         ...summarizeWorkspaceConnections(
           providerId,
-          workspace.connections,
+          workspaceConnectionsForProviderStatus(
+            providerId,
+            workspace.connections,
+            ctx.userEmail,
+          ),
           workspace.grants,
         ),
       };
@@ -185,27 +204,53 @@ export default defineAction({
       .map((provider) => {
         const optionalKeys = provider.optionalKeys ?? [];
         const requiredMode = provider.requiredMode ?? "all";
-        const hasRequiredCredentials =
-          requiredMode === "any"
-            ? provider.requiredKeys.some((key) => configuredKeys.has(key))
-            : provider.requiredKeys.every((key) => configuredKeys.has(key));
-        const missingRequiredKeys = hasRequiredCredentials
-          ? []
-          : provider.requiredKeys.filter((key) => !configuredKeys.has(key));
-        const configuredProviderKeys = [
-          ...provider.requiredKeys,
-          ...optionalKeys,
-        ].filter((key) => configuredKeys.has(key));
         const workspaceConnection =
           workspaceProviderStatusById.get(provider.provider) ??
           summarizeWorkspaceConnections(
             provider.provider,
-            workspace.connections,
+            workspaceConnectionsForProviderStatus(
+              provider.provider,
+              workspace.connections,
+              ctx.userEmail,
+            ),
             workspace.grants,
           );
+        const hasRequiredCredentials =
+          provider.provider === "bigquery"
+            ? configuredKeys.has("BIGQUERY_PROJECT_ID") &&
+              (configuredKeys.has("GOOGLE_APPLICATION_CREDENTIALS_JSON") ||
+                workspaceConnection.grantState === "connected")
+            : requiredMode === "any"
+              ? provider.requiredKeys.some((key) => configuredKeys.has(key))
+              : provider.requiredKeys.every((key) => configuredKeys.has(key));
+        const missingRequiredKeys =
+          provider.provider === "bigquery"
+            ? [
+                ...(!configuredKeys.has("BIGQUERY_PROJECT_ID")
+                  ? ["BIGQUERY_PROJECT_ID"]
+                  : []),
+                ...(!configuredKeys.has(
+                  "GOOGLE_APPLICATION_CREDENTIALS_JSON",
+                ) &&
+                workspaceConnection.grantState !== "connected" &&
+                !workspace.error
+                  ? [
+                      "GOOGLE_APPLICATION_CREDENTIALS_JSON or BigQuery OAuth connection",
+                    ]
+                  : []),
+              ]
+            : hasRequiredCredentials
+              ? []
+              : provider.requiredKeys.filter((key) => !configuredKeys.has(key));
+        const configuredProviderKeys = [
+          ...provider.requiredKeys,
+          ...optionalKeys,
+        ].filter((key) => configuredKeys.has(key));
         const configured =
-          hasRequiredCredentials ||
-          workspaceConnection.grantState === "connected";
+          provider.provider === "bigquery"
+            ? hasRequiredCredentials
+            : hasRequiredCredentials ||
+              workspaceConnection.grantState === "connected";
         return {
           provider: provider.provider,
           label: provider.label,
