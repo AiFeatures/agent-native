@@ -1203,6 +1203,17 @@ export default {
       pastePlaceholder: "--color-accent: #2563eb;\nPrimary color: #2563eb",
       importPasted: "Importar tokens pegados",
       importedCount: "{{count}} tokens importados",
+      importing: "Importando tokens…",
+      importedWithSkipped:
+        "Se importaron {{count}} tokens. Se omitieron {{skipped}} valores o archivos no válidos.",
+      importedWithOmissions:
+        "Se importaron {{count}} tokens. Se omitieron {{skipped}} elementos no válidos. No procesados por los límites (tokens: {{omittedTokens}}, archivos: {{omittedFiles}}).",
+      importedWithReadFailures:
+        "Se importaron {{count}} tokens, pero no se pudieron leer {{readFailures}} archivos. Vuelve a seleccionarlos e inténtalo de nuevo.",
+      importedWithReadFailuresAndOmissions:
+        "Se importaron {{count}} tokens. No se pudieron leer {{readFailures}} archivos. También se omitieron {{skipped}} elementos no válidos y los límites dejaron sin procesar {{omittedTokens}} tokens y {{omittedFiles}} archivos. Vuelve a seleccionar los archivos ilegibles e inténtalo de nuevo.",
+      noTokensFound:
+        "No se encontraron tokens válidos. Revisa el formato del archivo y los valores.",
       count: "{{count}} tokens",
       search: "Buscar tokens",
       noMatches: "No hay tokens coincidentes",

@@ -41,6 +41,11 @@ import {
 import { cn } from "@/lib/utils";
 
 import {
+  DESIGN_TOKEN_IMPORT_MAX_FILENAME_CHARS,
+  DESIGN_TOKEN_IMPORT_MAX_FILES,
+  DESIGN_TOKEN_IMPORT_MAX_TOTAL_BYTES,
+} from "../../../shared/design-token-import-limits";
+import {
   LAYER_ROW_GEOMETRY_CLASS,
   LayerRowIndentSlots,
   layerRowIndentCount,
@@ -72,7 +77,97 @@ interface ImportDesignTokensResult {
   designId: string;
   importedCount: number;
   filesAnalyzed: string[];
+  rejectedCount?: number;
+  skippedCount?: number;
+  omittedTokenCount?: number;
+  omittedFileCount?: number;
+  readFailureCount?: number;
   resolvedCssVars?: Record<string, string>;
+}
+
+export function createEmptyFilesImportResult(
+  designId: string,
+  omittedFileCount: number,
+  readFailureCount = 0,
+): ImportDesignTokensResult {
+  return {
+    designId,
+    importedCount: 0,
+    filesAnalyzed: [],
+    omittedFileCount,
+    readFailureCount,
+  };
+}
+
+export function getTokenImportStatus(result: {
+  importedCount: number;
+  rejectedCount?: number;
+  skippedCount?: number;
+  omittedTokenCount?: number;
+  omittedFileCount?: number;
+  readFailureCount?: number;
+}): {
+  key:
+    | "designEditor.tokens.importedCount"
+    | "designEditor.tokens.importedWithSkipped"
+    | "designEditor.tokens.importedWithOmissions"
+    | "designEditor.tokens.importedWithReadFailures"
+    | "designEditor.tokens.importedWithReadFailuresAndOmissions"
+    | "designEditor.tokens.noTokensFound";
+  values?: {
+    count: number;
+    skipped?: number;
+    omittedTokens?: number;
+    omittedFiles?: number;
+    readFailures?: number;
+  };
+} {
+  const skippedCount = (result.skippedCount ?? 0) + (result.rejectedCount ?? 0);
+  const readFailureCount = result.readFailureCount ?? 0;
+  const omittedTokenCount = result.omittedTokenCount ?? 0;
+  const omittedFileCount = result.omittedFileCount ?? 0;
+  if (readFailureCount > 0) {
+    if (skippedCount > 0 || omittedTokenCount > 0 || omittedFileCount > 0) {
+      return {
+        key: "designEditor.tokens.importedWithReadFailuresAndOmissions",
+        values: {
+          count: result.importedCount,
+          skipped: skippedCount,
+          omittedTokens: omittedTokenCount,
+          omittedFiles: omittedFileCount,
+          readFailures: readFailureCount,
+        },
+      };
+    }
+    return {
+      key: "designEditor.tokens.importedWithReadFailures",
+      values: { count: result.importedCount, readFailures: readFailureCount },
+    };
+  }
+  if (omittedTokenCount > 0 || omittedFileCount > 0) {
+    return {
+      key: "designEditor.tokens.importedWithOmissions",
+      values: {
+        count: result.importedCount,
+        skipped: skippedCount,
+        omittedTokens: omittedTokenCount,
+        omittedFiles: omittedFileCount,
+      },
+    };
+  }
+  if (skippedCount > 0) {
+    return {
+      key: "designEditor.tokens.importedWithSkipped",
+      values: { count: result.importedCount, skipped: skippedCount },
+    };
+  }
+  if (result.importedCount === 0) {
+    return { key: "designEditor.tokens.noTokensFound" };
+  }
+  return {
+    key: "designEditor.tokens.importedCount",
+    values: { count: result.importedCount },
+  };
 }
 
 interface TokenImportFile {
@@ -417,6 +512,8 @@ function AddTokenPopover({
 interface ImportTokensPopoverProps {
   onImportFiles: (
     files: TokenImportFile[],
+    omittedFileCount: number,
+    readFailureCount: number,
   ) => Promise<ImportDesignTokensResult>;
   onImportText: (text: string) => Promise<ImportDesignTokensResult>;
   onImportCurrentDesign: () => Promise<ImportDesignTokensResult>;
@@ -440,14 +537,11 @@ function ImportTokensPopover({
   const runImport = async (
     importer: () => Promise<ImportDesignTokensResult>,
   ) => {
-    setStatus(null);
+    setStatus(t("designEditor.tokens.importing"));
     try {
       const result = await importer();
-      setStatus(
-        t("designEditor.tokens.importedCount", {
-          count: result.importedCount,
-        }),
-      );
+      const status = getTokenImportStatus(result);
+      setStatus(status.values ? t(status.key, status.values) : t(status.key));
       if (result.importedCount > 0) {
         setText("");
       }
@@ -457,10 +551,16 @@ function ImportTokensPopover({
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.currentTarget.files;
-    event.currentTarget.value = "";
-    if (!files?.length) return;
-    void runImport(async () => onImportFiles(await readImportFiles(files)));
+    const files = snapshotImportFiles(event.currentTarget);
+    if (files.length === 0) return;
+    void runImport(async () => {
+      const imported = await readImportFiles(files);
+      return onImportFiles(
+        imported.files,
+        imported.omittedFileCount,
+        imported.readFailureCount,
+      );
+    });
   };
 
   return (
@@ -550,7 +650,11 @@ function ImportTokensPopover({
       />
 
       {status && (
-        <p className="mt-2 px-1 text-[10px] leading-snug text-muted-foreground">
+        <p
+          className="mt-2 px-1 text-[10px] leading-snug text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
           {status}
         </p>
       )}
@@ -608,8 +712,9 @@ function TokenCreateOption({
 const TOKEN_IMPORT_ACCEPT = [
   ".css",
   ".scss",
-  ".sass",
   ".less",
+  ".html",
+  ".htm",
   ".json",
   ".ts",
   ".tsx",
@@ -620,18 +725,76 @@ const TOKEN_IMPORT_ACCEPT = [
   ".txt",
 ].join(",");
 
-async function readImportFiles(fileList: FileList): Promise<TokenImportFile[]> {
-  const selected = [...fileList].slice(0, 20);
-  const files = await Promise.all(
-    selected.map(async (file) => ({
-      filename:
-        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
-        file.name,
-      content: await file.text(),
-    })),
-  );
+export function snapshotImportFiles(
+  input: Pick<HTMLInputElement, "files" | "value">,
+): File[] {
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+  return files;
+}
 
-  return files.filter((file) => file.content.trim().length > 0);
+export async function readImportFiles(selectedFiles: File[]): Promise<{
+  files: TokenImportFile[];
+  omittedFileCount: number;
+  readFailureCount: number;
+}> {
+  const selected = selectedFiles.slice(0, DESIGN_TOKEN_IMPORT_MAX_FILES);
+  const files: TokenImportFile[] = [];
+  const encoder = new TextEncoder();
+  let readBytes = 0;
+  let contentBytes = 0;
+  let omittedFileCount = selectedFiles.length - selected.length;
+  let readFailureCount = 0;
+
+  for (const file of selected) {
+    const relativePath =
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+      file.name;
+    let filename = relativePath.trim();
+    if (filename.length > DESIGN_TOKEN_IMPORT_MAX_FILENAME_CHARS) {
+      filename = file.name.trim();
+    }
+    if (!filename || filename.length > DESIGN_TOKEN_IMPORT_MAX_FILENAME_CHARS) {
+      omittedFileCount += 1;
+      continue;
+    }
+
+    if (
+      !Number.isSafeInteger(file.size) ||
+      file.size < 0 ||
+      readBytes + file.size > DESIGN_TOKEN_IMPORT_MAX_TOTAL_BYTES
+    ) {
+      omittedFileCount += 1;
+      continue;
+    }
+
+    let content: string;
+    try {
+      content = await file.text();
+    } catch {
+      readFailureCount += 1;
+      continue;
+    }
+    const encodedSize = encoder.encode(content).byteLength;
+    if (contentBytes + encodedSize > DESIGN_TOKEN_IMPORT_MAX_TOTAL_BYTES) {
+      omittedFileCount += 1;
+      continue;
+    }
+
+    readBytes += file.size;
+    contentBytes += encodedSize;
+    if (content.length === 0) continue;
+    files.push({
+      filename,
+      content,
+    });
+  }
+
+  return {
+    files,
+    omittedFileCount,
+    readFailureCount,
+  };
 }
 
 export function TokensPanel({ designId, onTokensApplied }: TokensPanelProps) {
@@ -721,14 +884,34 @@ export function TokensPanel({ designId, onTokensApplied }: TokensPanelProps) {
     return result;
   };
 
-  const importFiles = async (files: TokenImportFile[]) => {
+  const importFiles = async (
+    files: TokenImportFile[],
+    clientOmittedFileCount: number,
+    clientReadFailureCount: number,
+  ) => {
+    if (files.length === 0) {
+      return createEmptyFilesImportResult(
+        designId,
+        clientOmittedFileCount,
+        clientReadFailureCount,
+      );
+    }
+
     const requestDesignId = designId;
     const result = (await importMutation.mutateAsync({
       designId,
       source: "files",
       files,
     })) as ImportDesignTokensResult;
-    return handleImportSuccess(result, requestDesignId);
+    return handleImportSuccess(
+      {
+        ...result,
+        omittedFileCount:
+          (result.omittedFileCount ?? 0) + clientOmittedFileCount,
+        readFailureCount: clientReadFailureCount,
+      },
+      requestDesignId,
+    );
   };
 
   const importText = async (text: string) => {

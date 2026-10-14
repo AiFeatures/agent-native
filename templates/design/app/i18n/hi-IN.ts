@@ -1184,6 +1184,16 @@ export default {
       pastePlaceholder: "--color-accent: #2563eb;\nPrimary color: #2563eb",
       importPasted: "पेस्ट किए गए टोकन इम्पोर्ट करें",
       importedCount: "{{count}} टोकन इम्पोर्ट हुए",
+      importing: "टोकन इम्पोर्ट हो रहे हैं…",
+      importedWithSkipped:
+        "{{count}} टोकन इम्पोर्ट हुए। {{skipped}} अमान्य मान या फाइलें छोड़ी गईं।",
+      importedWithOmissions:
+        "{{count}} टोकन इम्पोर्ट हुए। {{skipped}} अमान्य आइटम छोड़े गए। सीमा के कारण प्रोसेस नहीं हुए (टोकन: {{omittedTokens}}, फाइलें: {{omittedFiles}})।",
+      importedWithReadFailures:
+        "{{count}} टोकन इम्पोर्ट हुए, लेकिन {{readFailures}} फ़ाइलें पढ़ी नहीं जा सकीं। उन्हें फिर से चुनकर दोबारा कोशिश करें।",
+      importedWithReadFailuresAndOmissions:
+        "{{count}} टोकन इम्पोर्ट हुए। {{readFailures}} फ़ाइलें पढ़ी नहीं जा सकीं। {{skipped}} अमान्य आइटम भी छोड़े गए और सीमा के कारण {{omittedTokens}} टोकन तथा {{omittedFiles}} फ़ाइलें प्रोसेस नहीं हुईं। न पढ़ी जा सकी फ़ाइलें फिर से चुनकर दोबारा कोशिश करें।",
+      noTokensFound: "कोई मान्य टोकन नहीं मिला। फाइल के फ़ॉर्मैट और टोकन मान जांचें।",
       count: "{{count}} टोकन",
       search: "टोकन खोजें",
       noMatches: "कोई मेल खाता टोकन नहीं",

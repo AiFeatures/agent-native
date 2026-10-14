@@ -1161,6 +1161,16 @@ export default {
       pastePlaceholder: "--color-accent: #2563eb;\nPrimary color: #2563eb",
       importPasted: "导入粘贴的令牌",
       importedCount: "已导入 {{count}} 个令牌",
+      importing: "正在导入令牌…",
+      importedWithSkipped:
+        "已导入 {{count}} 个令牌，已跳过 {{skipped}} 个无效值或文件。",
+      importedWithOmissions:
+        "已导入 {{count}} 个令牌，已跳过 {{skipped}} 个无效项。因导入限制未处理的数量：令牌 {{omittedTokens}}，文件 {{omittedFiles}}。",
+      importedWithReadFailures:
+        "已导入 {{count}} 个令牌，但无法读取 {{readFailures}} 个文件。请重新选择并重试。",
+      importedWithReadFailuresAndOmissions:
+        "已导入 {{count}} 个令牌。无法读取 {{readFailures}} 个文件。另跳过了 {{skipped}} 个无效项，且因导入限制未处理 {{omittedTokens}} 个令牌和 {{omittedFiles}} 个文件。请重新选择无法读取的文件并重试。",
+      noTokensFound: "未找到有效令牌。请检查文件格式和令牌值。",
       count: "{{count}} 个令牌",
       search: "搜索令牌",
       noMatches: "没有匹配的令牌",
