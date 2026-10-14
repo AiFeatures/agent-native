@@ -1298,7 +1298,7 @@ export default {
       figUploadProcessing: "変換中…",
       figImportWarningTitle: "大規模な .fig のインポート",
       figImportWarningDescription:
-        "このファイルには {{frames}} 個のフレームと {{nodes}} 個のレイヤーがあります。すべてをインポートするとエディターが遅くなる可能性があります。必要なフレームを選択してください。",
+        "このファイルには {{frames}} 個のフレームと {{nodes}} 個のレイヤーがあります。すべてをインポートするとエディターが遅くなる可能性があります。必要なページを選択してください。",
       figImportFrameCount: "{{total}} 個中 {{selected}} 個のフレームを選択",
       figImportSelectAll: "すべて選択",
       figImportClearAll: "すべて解除",
@@ -1307,6 +1307,12 @@ export default {
       figImportAll: "すべてインポート",
       figImportAnalyzing: "分析中…",
       figImportSaving: "{{total}} 個中 {{saved}} 個のフレームを保存中",
+      figImportFrameLimit:
+        "フレームの合計が {{max}} 個以下になるようにページを選択してください。",
+      figImportFramesSkippedWarning:
+        "複雑すぎてインポートできない {{count}} 個のフレームをスキップしました：{{names}}",
+      figUploadLimits:
+        "最大 {{size}} GB · 1 回のインポートで {{frames}} フレームまで",
       figUploadDescriptionShort:
         "ローカルインポート — Figma API の割り当てを使用しません。対応する埋め込み画像が含まれます。",
       figUploadImagesSkippedWarning:
@@ -2252,6 +2258,7 @@ export default {
     figmaLink: "Figmaリンク",
     importFromFigma: "Figma からインポート",
     figmaFile: "Figma ファイル (.fig)",
+    figmaFileMaxSize: "最大 {{max}} GB",
     openImport: "インポートを開く",
     importSelectedFile: "選択したファイルをインポート",
     starterSaasPrompt:

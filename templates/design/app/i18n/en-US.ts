@@ -1220,7 +1220,7 @@ export default {
       figUploadProcessing: "Converting…",
       figImportWarningTitle: "Large .fig import",
       figImportWarningDescription:
-        "This file contains {{frames}} frames and {{nodes}} layers. Importing everything may slow the editor. Choose the frames you need.",
+        "This file contains {{frames}} frames and {{nodes}} layers. Importing everything may slow the editor. Choose the pages you need.",
       figImportFrameCount: "{{selected}} of {{total}} frames selected",
       figImportSelectAll: "Select all",
       figImportClearAll: "Clear all",
@@ -1229,6 +1229,11 @@ export default {
       figImportAll: "Import all",
       figImportAnalyzing: "Analyzing…",
       figImportSaving: "Saving {{saved}} of {{total}} frames",
+      figImportFrameLimit:
+        "Choose pages with {{max}} frames or fewer in total.",
+      figImportFramesSkippedWarning:
+        "Skipped {{count}} frames that were too complex to import: {{names}}",
+      figUploadLimits: "Up to {{size}} GB · {{frames}} frames per import",
       figUploadDescriptionShort:
         "Local import — no Figma API quota used. Supported embedded images are included.",
       figUploadImagesSkippedWarning:
@@ -2162,6 +2167,7 @@ export default {
     figmaLink: "Figma link",
     importFromFigma: "Import from Figma",
     figmaFile: "Figma file (.fig)",
+    figmaFileMaxSize: "Up to {{max}} GB",
     openImport: "Open import",
     importSelectedFile: "Import selected file",
     starterSaasPrompt:
