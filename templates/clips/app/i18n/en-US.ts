@@ -2012,6 +2012,10 @@ const messages = {
     cleanupWithAi: "Cleanup with AI",
     cleanupComplete: "Dictation cleaned up",
     cleanupFailed: "Couldn't clean up dictation",
+    undoCleanup: "Undo",
+    restoreOriginal: "Restore original",
+    cleanupRestored: "Original dictation restored",
+    cleanupRestoreFailed: "Couldn't restore original dictation",
     startFirst: "Turn your thoughts into text",
     recordOnDesktop: "Record on desktop",
     emptyDesktopDescription:
