@@ -774,6 +774,7 @@ export {
   requestBuilderBrowserConnection,
   resolveBuilderBranchProjectId,
   resolveIsBuilderBranchingEnabled,
+  normalizeBuilderAgentAttachments,
   runBuilderAgent,
   type BuilderAgentAttachment,
   type BuilderAgentUploadAttachment,
