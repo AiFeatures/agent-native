@@ -4909,11 +4909,12 @@ Non-code requests are still fine on this surface: read data, navigate the UI, su
         jevContextCompact: leanPrompt || lazyContext,
         initialToolNames: effectiveInitialToolNames,
         ...(options?.toolLimits ? { toolLimits: options.toolLimits } : {}),
-        onEngineResolved: (engine, model) => {
+        onEngineResolved: (engine, model, reasoningEffort) => {
           const runCtx = ensureRequestRunContext();
           if (runCtx) {
             runCtx.engine = engine;
             runCtx.model = model;
+            runCtx.reasoningEffort = reasoningEffort;
           }
         },
         onRunPrepared: persistSubmittedUserMessage,
@@ -4994,11 +4995,12 @@ Non-code requests are still fine on this surface: read data, navigate the UI, su
                 ),
               skipFilesContext: true,
               initialToolNames: effectiveInitialToolNames,
-              onEngineResolved: (engine, model) => {
+              onEngineResolved: (engine, model, reasoningEffort) => {
                 const runCtx = ensureRequestRunContext();
                 if (runCtx) {
                   runCtx.engine = engine;
                   runCtx.model = model;
+                  runCtx.reasoningEffort = reasoningEffort;
                 }
               },
               onRunPrepared: persistSubmittedUserMessage,
@@ -5249,11 +5251,12 @@ Non-code requests are still fine on this surface: read data, navigate the UI, su
           skipFilesContext,
           initialToolNames: effectiveInitialToolNames,
           ...(options?.toolLimits ? { toolLimits: options.toolLimits } : {}),
-          onEngineResolved: (engine, model) => {
+          onEngineResolved: (engine, model, reasoningEffort) => {
             const runCtx = ensureRequestRunContext();
             if (runCtx) {
               runCtx.engine = engine;
               runCtx.model = model;
+              runCtx.reasoningEffort = reasoningEffort;
             }
           },
           onRunPrepared: persistSubmittedUserMessage,
