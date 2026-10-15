@@ -1126,6 +1126,7 @@ const PROVIDER_CONFIGS: Record<ProviderApiId, ProviderApiConfig> = {
       },
     ],
     notes: [
+      "To answer a question about a Gong account, deal, customer, or topic, use Gong's connected MCP tools (ask_account, ask_deal, generate_brief) when available; Gong searches the calls server-side and answers in one request. Gong's REST API has no account, company, or topic filter, so finding one account's calls or a topic through /calls or /calls/extensive means scanning the whole org, and those responses truncate at the size limit. If the Analytics app is connected, ask it with call-agent; it owns Gong search. Use the REST endpoints below only for exact counts, verbatim quotes, or proof of absence across a bounded cohort.",
       "For broad corpus work, call /calls/extensive with provider-api-request and stageAs/saveToFile. Gong returns the next cursor at records.cursor and expects the next cursor in the POST body at cursor, so use pagination { nextCursorPath: 'records.cursor', cursorBodyPath: 'cursor' } for stageAs or fetchAllPages { cursorPath: 'records.cursor', cursorBodyPath: 'cursor' } for saveToFile.",
       "The public Gong REST API does not expose an arbitrary transcript-text filter. Use configured keyword tracker results from /calls/extensive when they cover the requested term; otherwise batch transcripts with POST /calls/transcript and body { filter: { callIds: [...] } } after narrowing or staging call ids.",
     ],
@@ -2097,6 +2098,7 @@ export async function executeProviderApiRequest(
         contentType: resp.contentType,
         status: resp.status,
         ok: resp.ok,
+        truncated: resp.truncated,
       };
     });
 
@@ -2150,6 +2152,11 @@ export async function executeProviderApiRequest(
   );
 
   if (args.saveToFile) {
+    if (response.truncated) {
+      throw new Error(
+        `The response was cut at ${effectiveMaxBytes} bytes (${response.size} available), so saving it would persist an incomplete file. Narrow the request with a server-side filter or fetch it in pages with fetchAllPages.`,
+      );
+    }
     const rawText =
       response.text ??
       (response.json !== undefined ? JSON.stringify(response.json) : "");
@@ -2195,12 +2202,21 @@ export async function executeProviderApiRequest(
     },
     response,
     guidance: [
-      "This was a raw provider API request. Use provider docs/spec URLs to choose endpoints and include method/path/status plus relevant filters in the methodology. Prefer this escape hatch whenever canned actions are too narrow.",
+      "This was a raw provider API request. Use provider docs/spec URLs to choose endpoints and include method/path/status plus relevant filters in the methodology. A data API returns records: when the provider can filter, search, or answer the question itself, make it do that instead of pulling records to filter locally.",
+      response.truncated
+        ? truncatedResponseGuidance(response.size, effectiveMaxBytes)
+        : null,
       providerAccessErrorGuidance(config, response.status),
     ]
       .filter(Boolean)
       .join(" "),
   };
+}
+
+// A truncated body is incomplete, not a smaller answer. Raising maxBytes and
+// paging the whole collection is the wrong recovery, so name the right ones.
+function truncatedResponseGuidance(size: number, maxBytes: number): string {
+  return `This response is incomplete: ${size} bytes came back and only the first ${maxBytes} are included. Do not raise maxBytes or page the whole collection to filter it locally. Add a server-side filter or query parameter, use the provider's own search or semantic tool, or run the scan with stageAs or provider-corpus-job. If none of those can express the question, say so or hand it to the app that owns this source.`;
 }
 
 const PROVIDER_ACCESS_ERROR_STATUSES = new Set([401, 403, 404]);
@@ -3088,6 +3104,7 @@ async function executeCustomProviderApiRequest(
         contentType: resp.contentType,
         status: resp.status,
         ok: resp.ok,
+        truncated: resp.truncated,
       };
     });
 
@@ -3140,6 +3157,11 @@ async function executeCustomProviderApiRequest(
   });
 
   if (args.saveToFile) {
+    if (response.truncated) {
+      throw new Error(
+        `The response was cut at ${effectiveMaxBytes} bytes (${response.size} available), so saving it would persist an incomplete file. Narrow the request with a server-side filter or fetch it in pages with fetchAllPages.`,
+      );
+    }
     const rawText =
       response.text ??
       (response.json !== undefined ? JSON.stringify(response.json) : "");
@@ -3188,8 +3210,14 @@ async function executeCustomProviderApiRequest(
       ),
     },
     response,
-    guidance:
+    guidance: [
       "This was a raw provider API request to a custom provider. Use provider docs URLs to choose endpoints.",
+      response.truncated
+        ? truncatedResponseGuidance(response.size, effectiveMaxBytes)
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
   };
 }
 
@@ -6255,6 +6283,7 @@ async function fetchAllPages(
     contentType: string | null;
     status: number;
     ok: boolean;
+    truncated: boolean;
   }>,
 ): Promise<{
   items: unknown[];
@@ -6312,6 +6341,12 @@ async function fetchAllPages(
         `fetchAllPages request failed with HTTP ${page.status}${
           preview ? `: ${preview}` : ""
         }`,
+      );
+    }
+
+    if (page.truncated) {
+      throw new Error(
+        `fetchAllPages page ${pageCount} was cut at the response size limit, so its items and next cursor are incomplete. Request smaller pages (a lower limit or fewer fields) or add a server-side filter.`,
       );
     }
 

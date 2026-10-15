@@ -4132,6 +4132,90 @@ describe("provider API runtime", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("tells the caller a truncated response is incomplete and how to recover", async () => {
+    resolveCredential.mockResolvedValue("hubspot-token");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: "x".repeat(5_000) }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const runtime = createProviderApiRuntime({
+      appId: "analytics",
+      providerIds: ["hubspot"],
+      getCredentialContext: () => credentialContext,
+    });
+
+    const result = (await runtime.executeRequest({
+      provider: "hubspot",
+      path: "/crm/v3/objects/deals",
+      maxBytes: 1_000,
+    })) as { response: { truncated: boolean }; guidance: string };
+
+    expect(result.response.truncated).toBe(true);
+    expect(result.guidance).toContain("This response is incomplete");
+    expect(result.guidance).toContain("server-side filter");
+    expect(result.guidance).not.toContain("Prefer this escape hatch");
+  });
+
+  it("refuses to save a truncated response to a file as complete", async () => {
+    resolveCredential.mockResolvedValue("hubspot-token");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      new Response("x".repeat(21 * 1024 * 1024), {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      }),
+    );
+    const runtime = createProviderApiRuntime({
+      appId: "analytics",
+      providerIds: ["hubspot"],
+      getCredentialContext: () => credentialContext,
+    });
+
+    await expect(
+      runtime.executeRequest({
+        provider: "hubspot",
+        path: "/crm/v3/objects/deals",
+        saveToFile: "analysis/deals.txt",
+      }),
+    ).rejects.toThrow(/would persist an incomplete file/);
+  });
+
+  it("fails fetchAllPages loudly when a page is cut at the size limit", async () => {
+    resolveCredential.mockResolvedValue("hubspot-token");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: "x".repeat(5_000) }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const runtime = createProviderApiRuntime({
+      appId: "analytics",
+      providerIds: ["hubspot"],
+      getCredentialContext: () => credentialContext,
+    });
+
+    await expect(
+      runtime.executeRequest({
+        provider: "hubspot",
+        path: "/crm/v3/objects/deals",
+        maxBytes: 1_000,
+        fetchAllPages: {
+          cursorPath: "paging.next.after",
+          cursorParam: "after",
+          itemsPath: "results",
+          maxPages: 2,
+        },
+      }),
+    ).rejects.toThrow(/cut at the response size limit/);
+  });
+
   it("deduplicates identical concurrent GET provider requests", async () => {
     resolveCredential.mockResolvedValue("hubspot-token");
     const fetchMock = vi.mocked(globalThis.fetch);
