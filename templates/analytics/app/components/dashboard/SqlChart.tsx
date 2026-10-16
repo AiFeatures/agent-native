@@ -1233,6 +1233,12 @@ interface SqlChartProps {
   loadData?: boolean;
   resultOverride?: SqlQueryResult;
   showLoadingWhenDisabled?: boolean;
+  /**
+   * `loadData: false` means the panel is only offscreen, so its last result
+   * stays on screen, marked as the previous filters when its SQL has changed,
+   * instead of the skeleton.
+   */
+  retainWhileOffscreen?: boolean;
   timeRange?: number;
   reportScreenshot?: boolean;
   refreshToken?: number;
@@ -1258,6 +1264,7 @@ export function SqlChart({
   loadData = true,
   resultOverride,
   showLoadingWhenDisabled = true,
+  retainWhileOffscreen = false,
   timeRange,
   reportScreenshot = false,
   refreshToken = 0,
@@ -1313,6 +1320,8 @@ export function SqlChart({
       reportScreenshot,
       refreshToken: refreshToken + localRefreshToken,
       retainPreviousScope,
+      retainWhilePaused: retainWhileOffscreen,
+      reuseCompletedOnEnable: retainWhileOffscreen,
     },
   );
 
@@ -1329,6 +1338,12 @@ export function SqlChart({
     (rawRows.length > 0 || !queryError);
   const isShowingPreviousFilters =
     !resultOverride && queryResult !== undefined && queryIsPlaceholderData;
+  const isPausedOnPreviousFilters =
+    !resultOverride &&
+    retainWhileOffscreen &&
+    !loadData &&
+    queryResult !== undefined &&
+    queryIsPlaceholderData;
   const isFetching = resultOverride ? false : queryIsFetching && !isUpdating;
   const error =
     rawRows.length === 0
@@ -1425,7 +1440,12 @@ export function SqlChart({
       : "min-h-[250px]";
   const placeholderPadY = isMetric ? "py-2" : "py-8";
 
-  if (isLoading || isFetching || (!loadData && showLoadingWhenDisabled)) {
+  const showsRetainedResult = retainWhileOffscreen && queryResult !== undefined;
+  if (
+    isLoading ||
+    isFetching ||
+    (!loadData && showLoadingWhenDisabled && !showsRetainedResult)
+  ) {
     return <SqlChartLoadingSkeleton panel={panel} />;
   }
 
@@ -1469,6 +1489,15 @@ export function SqlChart({
             ? "sqlDashboard.updatingPreviousFilters"
             : "sqlDashboard.updating",
         )}
+      </span>
+    </div>
+  ) : isPausedOnPreviousFilters ? (
+    <div className="pointer-events-none relative h-0">
+      <span
+        data-dashboard-report-paused="previous-filters"
+        className="absolute right-0 top-0 z-10 inline-flex items-center rounded-full border bg-background/90 px-2 py-0.5 text-xs text-muted-foreground shadow-sm"
+      >
+        {t("sqlDashboard.previousFilters")}
       </span>
     </div>
   ) : null;
