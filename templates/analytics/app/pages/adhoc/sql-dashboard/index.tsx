@@ -1362,6 +1362,8 @@ function SqlDashboardPageContent({
           changed: result.changed,
           updatedAt: result.updatedAt,
           revisionId: result.revisionId,
+          changes: result.changes,
+          omittedChanges: result.omittedChanges,
         };
       },
     );

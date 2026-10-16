@@ -59,13 +59,23 @@ Every meaningful dashboard save snapshots the previous state into
 points and `restore-dashboard-revision` to restore one; restore snapshots the
 current state first, then syncs open dashboard editors.
 
-On the page, each of an editor's own saves shows a toast: "Saved for everyone"
-(org or public visibility; "Saved" when private), how many others have the
-dashboard open, and Undo. That Undo restores the revision its save left (a
-full-config `update-dashboard` save returns it as `revisionId`), but only while
-the dashboard is as that save left it: once someone else has saved, it fails
-rather than taking their change back. For "undo my last change" in chat,
-restore the newest revision from `list-dashboard-revisions`.
+Each revision's `changes` names what the save that left it behind changed
+(`panel-added`, `column-resized`, `filter-changed`, `version-restored`, and so
+on), so restoring it undoes that change and every later one. To answer "undo
+the column I widened", pick the revision whose `changes` match instead of
+guessing from times. `changesStatus` is `absent` for revisions saved before
+changes were recorded and `unreadable` when the stored list is corrupt; say you
+can't tell what those changed rather than treating them as empty.
+
+On the page, an editor's own saves show a toast that names the change its Undo
+takes back, says "Saved for everyone" (org or public visibility; "Saved" when
+private), and counts the others who have the dashboard open. That Undo
+restores the revision its save left (a full-config `update-dashboard` save
+returns it as `revisionId`), but only while the dashboard is as that save left
+it: once someone else has saved, it fails rather than taking their change back.
+For "undo my last change" in chat, restore the newest revision from
+`list-dashboard-revisions`. The History panel shows each revision's first
+change with "+N more".
 
 Saved analyses follow the same undo model with `analysis_revisions`,
 `list-analysis-revisions`, and `restore-analysis-revision`.
