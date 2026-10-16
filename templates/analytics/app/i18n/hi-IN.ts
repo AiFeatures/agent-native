@@ -1060,6 +1060,14 @@ export default {
     operationalPain: "ऑपरेशन संबंधी दर्द",
     untitledTheme: "शीर्षकहीन विषय",
   },
+  dashboardSaveStatus: {
+    saved: "सहेजा गया",
+    savedShared: "सबके लिए सहेजा गया",
+    saving: "सहेजा जा रहा है…",
+    savingShared: "सबके लिए सहेजा जा रहा है…",
+    oneOtherViewer: "1 और व्यक्ति ने इसे खोला हुआ है",
+    otherViewers: "{{count}} और लोगों ने इसे खोला हुआ है",
+  },
   dashboard: {
     sqlDashboard: "SQL dashboard",
     historyTitle: "डैशबोर्ड इतिहास",

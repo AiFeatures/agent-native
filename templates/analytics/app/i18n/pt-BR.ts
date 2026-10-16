@@ -1107,6 +1107,14 @@ export default {
     operationalPain: "Dor operacional",
     untitledTheme: "Tema sem título",
   },
+  dashboardSaveStatus: {
+    saved: "Salvo",
+    savedShared: "Salvo para todos",
+    saving: "Salvando…",
+    savingShared: "Salvando para todos…",
+    oneOtherViewer: "1 outra pessoa está com ele aberto",
+    otherViewers: "{{count}} outras pessoas estão com ele aberto",
+  },
   dashboard: {
     sqlDashboard: "SQL dashboard",
     historyTitle: "Histórico do painel",

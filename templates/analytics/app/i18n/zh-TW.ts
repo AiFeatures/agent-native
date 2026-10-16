@@ -1021,6 +1021,14 @@ export default {
     operationalPain: "營運痛點",
     untitledTheme: "無標題主題",
   },
+  dashboardSaveStatus: {
+    saved: "已儲存",
+    savedShared: "已為所有人儲存",
+    saving: "正在儲存…",
+    savingShared: "正在為所有人儲存…",
+    oneOtherViewer: "另有 1 人正在檢視",
+    otherViewers: "另有 {{count}} 人正在檢視",
+  },
   dashboard: {
     sqlDashboard: "SQL 儀表板",
     historyTitle: "儀表板歷史記錄",

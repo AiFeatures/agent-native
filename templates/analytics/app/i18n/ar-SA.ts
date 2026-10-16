@@ -1070,6 +1070,14 @@ export default {
     operationalPain: "الألم التشغيلي",
     untitledTheme: "موضوع بدون عنوان",
   },
+  dashboardSaveStatus: {
+    saved: "تم الحفظ",
+    savedShared: "تم الحفظ للجميع",
+    saving: "جارٍ الحفظ…",
+    savingShared: "جارٍ الحفظ للجميع…",
+    oneOtherViewer: "شخص آخر يفتحها الآن",
+    otherViewers: "{{count}} آخرون يفتحونها الآن",
+  },
   dashboard: {
     sqlDashboard: "SQL dashboard",
     historyTitle: "سجل لوحة المعلومات",

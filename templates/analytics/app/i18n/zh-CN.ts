@@ -1026,6 +1026,14 @@ export default {
     operationalPain: "操作痛",
     untitledTheme: "无标题主题",
   },
+  dashboardSaveStatus: {
+    saved: "已保存",
+    savedShared: "已为所有人保存",
+    saving: "正在保存…",
+    savingShared: "正在为所有人保存…",
+    oneOtherViewer: "另有 1 人正在查看",
+    otherViewers: "另有 {{count}} 人正在查看",
+  },
   dashboard: {
     sqlDashboard: "SQL dashboard",
     historyTitle: "仪表板历史记录",
