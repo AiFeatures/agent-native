@@ -1118,6 +1118,12 @@ export default {
     operationalPain: "Douleur opérationnelle",
     untitledTheme: "Thème sans titre",
   },
+  dashboardFilterScope: {
+    onlyYou: "Vous seul voyez ces filtres",
+    hint: "Modifier les filtres ne change le tableau de bord pour personne d'autre. Pour les partager, envoyez le lien.",
+    hintSaveView:
+      "Modifier les filtres ne change le tableau de bord pour personne d'autre. Pour les partager, enregistrez une vue ou envoyez le lien.",
+  },
   dashboardSaveStatus: {
     saved: "Enregistré",
     savedShared: "Enregistré pour tout le monde",

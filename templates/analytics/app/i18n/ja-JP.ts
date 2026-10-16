@@ -1092,6 +1092,12 @@ export default {
     operationalPain: "手術の痛み",
     untitledTheme: "無題のテーマ",
   },
+  dashboardFilterScope: {
+    onlyYou: "このフィルターはあなたにだけ表示されます",
+    hint: "フィルターを変えても、ほかの人のダッシュボードは変わりません。共有するにはリンクを送ってください。",
+    hintSaveView:
+      "フィルターを変えても、ほかの人のダッシュボードは変わりません。共有するには、ビューを保存するかリンクを送ってください。",
+  },
   dashboardSaveStatus: {
     saved: "保存済み",
     savedShared: "全員向けに保存済み",

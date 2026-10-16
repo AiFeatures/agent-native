@@ -1112,6 +1112,12 @@ export default {
     operationalPain: "Dolor operacional",
     untitledTheme: "Tema sin título",
   },
+  dashboardFilterScope: {
+    onlyYou: "Solo usted ve estos filtros",
+    hint: "Cambiar los filtros no cambia el panel para nadie más. Para compartirlos, envíe el enlace.",
+    hintSaveView:
+      "Cambiar los filtros no cambia el panel para nadie más. Para compartirlos, guarde una vista o envíe el enlace.",
+  },
   dashboardSaveStatus: {
     saved: "Guardado",
     savedShared: "Guardado para todos",

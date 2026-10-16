@@ -5,6 +5,7 @@ import {
   IconDeviceFloppy,
   IconFilterOff,
   IconPlus,
+  IconUser,
 } from "@tabler/icons-react";
 import {
   useCallback,
@@ -46,6 +47,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { DateRangeInput } from "../_shared/components/DateRangeInput";
@@ -152,6 +158,9 @@ interface DashboardFilterBarProps {
   filters: DashboardFilter[];
   // null while the saved views load or after they fail: Reset cannot know its target, so it stays hidden.
   views?: readonly DashboardSavedView[] | null;
+  // While a cached list refetches it can still hold a deleted view, so Reset is
+  // disabled rather than put that view's id back in the URL.
+  viewsRefreshing?: boolean;
   onSaveView?: (
     name: string,
     filters: Record<string, string>,
@@ -166,6 +175,7 @@ interface DashboardFilterBarProps {
 export function DashboardFilterBar({
   filters,
   views = NO_VIEWS,
+  viewsRefreshing = false,
   onSaveView,
   onSavePreset,
   shared = false,
@@ -261,25 +271,22 @@ export function DashboardFilterBar({
     [uniqueFilters, getParam],
   );
 
-  const canReset =
+  // Reset, the only-you label and Save view share this one test: the label's
+  // tooltip offers saving a view, so the button must show whenever it does.
+  const filtersChanged =
     views !== null &&
     !filtersMatchView(
       uniqueFilters,
       searchParams,
       resetTargetView(views, searchParams),
     );
-  const filtersChanged = !filtersMatchView(
-    uniqueFilters,
-    searchParams,
-    views?.find((view) => view.isDefault),
-  );
 
   return (
     <>
       <Collapsible
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
-        className="group rounded-lg bg-card px-3 py-2"
+        className="group @container rounded-lg bg-card px-3 py-2"
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <span className="self-center text-xs font-medium text-muted-foreground group-data-[state=open]:hidden">
@@ -341,11 +348,34 @@ export function DashboardFilterBar({
               </CollapsibleTrigger>
             </div>
             {/* Outside the hover group on purpose: hidden until hover, people missed it. */}
-            {canReset && (
+            {filtersChanged && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    tabIndex={0}
+                    className="flex items-center gap-1 px-2 text-xs text-muted-foreground"
+                  >
+                    <IconUser className="h-3 w-3" />
+                    {/* Below this bar width the text pushes four filters onto a
+                        second row each time a filter changes, moving the page. */}
+                    <span className="sr-only @min-[68rem]:not-sr-only">
+                      {t("dashboardFilterScope.onlyYou")}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  {onSaveView
+                    ? t("dashboardFilterScope.hintSaveView")
+                    : t("dashboardFilterScope.hint")}
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {filtersChanged && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                disabled={viewsRefreshing}
                 onClick={resetFilters}
               >
                 <IconFilterOff className="h-3 w-3 mr-1" />
