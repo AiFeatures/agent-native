@@ -26,7 +26,7 @@ jobs:
     name: Full signup flow
     # Each run creates durable canary accounts. Keep the unattended Beta
     # schedule disabled until every Beta runtime and migration database is isolated.
-    if: ${{ github.repository_owner == 'BuilderIO' && (github.event_name != 'schedule' || vars.BETA_DATABASES_ISOLATED == 'true') }}
+    if: ${{ github.event_name != 'schedule' || vars.BETA_DATABASES_ISOLATED == 'true' }}
     uses: ./.github/workflows/beta-e2e.yml
     with:
       apps: ${{ inputs.apps || 'all' }}
