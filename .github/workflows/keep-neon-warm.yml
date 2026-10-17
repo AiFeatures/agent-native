@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   warm:
+    if: github.repository_owner == 'BuilderIO'
     name: Audit app health endpoints
     runs-on: ubuntu-latest
     timeout-minutes: 5

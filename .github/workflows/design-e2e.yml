@@ -28,6 +28,7 @@ permissions:
 
 jobs:
   e2e:
+    if: github.repository_owner == 'BuilderIO'
     name: ${{ matrix.shard == 'runtime-budget' && 'Runtime budget' || github.event_name == 'pull_request' && 'Design PR E2E' || format('Shard {0}/8', matrix.shard) }}
     runs-on: ubuntu-latest
     permissions:
@@ -218,7 +219,9 @@ jobs:
   report:
     name: Report scheduled Design E2E failures
     if: >-
-      ${{ always() && github.event_name == 'schedule' && needs.e2e.result != 'success' && needs.e2e.result != 'skipped' }}
+      ${{ github.repository_owner == 'BuilderIO' && (
+        always() && github.event_name == 'schedule' && needs.e2e.result != 'success' && needs.e2e.result != 'skipped'
+      ) }}
     needs: [e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 10

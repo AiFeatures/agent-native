@@ -19,7 +19,7 @@ permissions:
 jobs:
   mirror:
     name: Mirror Postgres service images
-    if: github.ref == 'refs/heads/main'
+    if: ${{ github.repository_owner == 'BuilderIO' && (github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

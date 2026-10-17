@@ -82,7 +82,7 @@ jobs:
   verify-stable-merge:
     name: Verify stable release merge
     # An unmarked push can never verify, so skip the runner entirely.
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[stable-release]')) }}
+    if: ${{ github.repository_owner == 'BuilderIO' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[stable-release]'))) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -136,7 +136,7 @@ jobs:
   deploy-gate:
     name: Deploy paths (release gate)
     needs: [verify-stable-merge]
-    if: ${{ github.event_name == 'push' && needs.verify-stable-merge.outputs.verified == 'true' }}
+    if: ${{ github.repository_owner == 'BuilderIO' && (github.event_name == 'push' && needs.verify-stable-merge.outputs.verified == 'true') }}
     permissions:
       contents: read
       packages: read
@@ -146,7 +146,7 @@ jobs:
 
   detect-nightly-changes:
     name: Check for package changes since the last nightly
-    if: ${{ github.event_name == 'schedule' }}
+    if: ${{ github.repository_owner == 'BuilderIO' && (github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -220,7 +220,7 @@ jobs:
   publish-nightly:
     name: Publish nightly snapshot
     needs: [detect-nightly-changes]
-    if: ${{ github.event_name == 'schedule' && needs.detect-nightly-changes.outputs.changed == 'true' }}
+    if: ${{ github.repository_owner == 'BuilderIO' && (github.event_name == 'schedule' && needs.detect-nightly-changes.outputs.changed == 'true') }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -335,7 +335,7 @@ jobs:
 
   publish-dev-snapshot:
     name: Publish dev snapshot
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.devTag != '' }}
+    if: ${{ github.repository_owner == 'BuilderIO' && (github.event_name == 'workflow_dispatch' && inputs.devTag != '') }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -406,7 +406,7 @@ jobs:
     # Version Packages PR, and a skipped need would otherwise skip this job. The
     # verifier must still have succeeded, and a publishing push must have
     # passed the gate.
-    if: ${{ !cancelled() && needs.verify-stable-merge.result == 'success' && !inputs.redispatchDownstream && !inputs.devTag && needs.verify-stable-merge.outputs.verified == 'true' && (github.event_name != 'push' || needs.deploy-gate.result == 'success') }}
+    if: ${{ github.repository_owner == 'BuilderIO' && (!cancelled() && needs.verify-stable-merge.result == 'success' && !inputs.redispatchDownstream && !inputs.devTag && needs.verify-stable-merge.outputs.verified == 'true' && (github.event_name != 'push' || needs.deploy-gate.result == 'success')) }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -617,14 +617,16 @@ jobs:
   notify-downstream:
     name: Notify downstream repos
     needs: [release, verify-stable-merge]
-    if: |
-      always() &&
-      !inputs.devTag &&
-      (
+    if: >-
+      ${{ github.repository_owner == 'BuilderIO' && (
+        always() &&
+        !inputs.devTag &&
+        (
         inputs.redispatchDownstream ||
         github.event_name == 'workflow_dispatch' ||
         needs.verify-stable-merge.outputs.verified == 'true'
-      )
+        )
+      ) }}
     runs-on: ubuntu-latest
     permissions: {}
     steps:

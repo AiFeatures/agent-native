@@ -31,6 +31,7 @@ permissions:
 
 jobs:
   reap:
+    if: github.repository_owner == 'BuilderIO'
     name: Sweep leaked databases
     runs-on: ubuntu-latest
     timeout-minutes: 15

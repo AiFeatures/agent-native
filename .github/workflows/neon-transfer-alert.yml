@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   alert:
+    if: github.repository_owner == 'BuilderIO'
     name: Check daily public network transfer
     runs-on: ubuntu-latest
     timeout-minutes: 10
