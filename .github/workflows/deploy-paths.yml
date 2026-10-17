@@ -60,10 +60,10 @@ jobs:
         target: [node, docker, presets]
     services:
       postgres:
-        image: ghcr.io/builderio/agent-native-ci-postgres-fallback:17-alpine
-        credentials:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        # Upstream mirror is private to BuilderIO; forks use the Docker Hub image.
+        image: ${{ github.repository_owner == 'BuilderIO' && 'ghcr.io/builderio/agent-native-ci-postgres-fallback:17-alpine' || 'postgres:17-alpine' }}
+        # Empty username/password strings are rejected, so the whole mapping is conditional.
+        credentials: ${{ github.repository_owner == 'BuilderIO' && fromJSON(format('{{"username":"{0}","password":"{1}"}}', github.actor, secrets.GITHUB_TOKEN)) || fromJSON('{}') }}
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
